@@ -62,8 +62,7 @@ createService({
 			subject: 'os.genie.agents.list',
 			handler: (msg) => {
 				try {
-					// Filter out proxy sessions from the list
-					const sessions = tmux.listSessions().filter((s) => !s.name.startsWith('_genie_'));
+					const sessions = tmux.listSessions();
 					const windows = tmux.listWindows();
 					const panes = tmux.listPanes();
 					const registry = loadAgentRegistry();
