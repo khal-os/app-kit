@@ -11,6 +11,7 @@
  *   os.genie.term.<id>.resize   (browser → service, cols/rows)
  *   os.genie.term.<id>.exit     (service → browser)
  */
+// ARCHITECTURE DECISION: Terminal I/O uses tmux control mode (-CC). NEVER use node-pty, linked sessions, or _genie_proxy_* patterns. See wish tmux-control-mode-terminal.
 
 import { execSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
