@@ -1,7 +1,7 @@
 /**
- * Terminal proxy — spawns PTY processes that attach to existing tmux panes.
- * Uses the same NATS subject pattern as the pty-service so the xterm.js
- * client code can be reused with minimal changes.
+ * Terminal proxy — uses tmux control mode to stream pane I/O.
+ * One control mode connection per tmux session, multiplexing all pane output.
+ * Zero linked sessions, zero PTY processes.
  *
  * Subjects:
  *   os.genie.term.create   → { tmuxPaneId, cols?, rows? } → { sessionId }
@@ -15,33 +15,59 @@
 import { execSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import type { NatsConnection } from '@nats-io/transport-node';
-import * as pty from 'node-pty';
+import type { ControlSession, TmuxControl } from './tmux-control';
 
 const PREFIX = 'os.genie.term';
 
 interface ProxySession {
 	sessionId: string;
 	tmuxPaneId: string;
-	linkedSessionName: string;
-	process: pty.IPty;
-	buffer: Buffer[];
-	bufferBytes: number;
+	tmuxSessionName: string;
+	controlSession: ControlSession;
+	outputHandler: (paneId: string, data: Buffer) => void;
 }
 
-const MAX_BUFFER = 512 * 1024; // 512KB
-
-function addToBuffer(session: ProxySession, data: string): void {
-	const chunk = Buffer.from(data, 'utf8');
-	session.buffer.push(chunk);
-	session.bufferBytes += chunk.length;
-	while (session.bufferBytes > MAX_BUFFER && session.buffer.length > 0) {
-		const removed = session.buffer.shift();
-		if (removed) session.bufferBytes -= removed.length;
-	}
+interface ControlEntry {
+	controlSession: ControlSession;
+	refCount: number;
 }
 
-export function createTerminalProxy(nc: NatsConnection) {
+export function createTerminalProxy(nc: NatsConnection, tmux: TmuxControl) {
 	const sessions = new Map<string, ProxySession>();
+	const controlSessions = new Map<string, ControlEntry>();
+
+	function getOrCreateControl(sessionName: string): ControlSession {
+		let entry = controlSessions.get(sessionName);
+		if (entry) {
+			entry.refCount++;
+			return entry.controlSession;
+		}
+
+		const cs = tmux.attachSession(sessionName);
+		entry = { controlSession: cs, refCount: 1 };
+		controlSessions.set(sessionName, entry);
+
+		// If the control session exits, notify all proxy sessions using it
+		cs.on('exit', () => {
+			for (const [sid, session] of sessions) {
+				if (session.tmuxSessionName === sessionName) {
+					nc.publish(`${PREFIX}.${sid}.exit`, JSON.stringify({ sessionId: sid, code: 0 }));
+				}
+			}
+		});
+
+		return cs;
+	}
+
+	function releaseControl(sessionName: string): void {
+		const entry = controlSessions.get(sessionName);
+		if (!entry) return;
+		entry.refCount--;
+		if (entry.refCount <= 0) {
+			entry.controlSession.detach();
+			controlSessions.delete(sessionName);
+		}
+	}
 
 	function create(tmuxPaneId: string, cols = 80, rows = 24): string {
 		const sessionId = randomUUID();
@@ -57,121 +83,100 @@ export function createTerminalProxy(nc: NatsConnection) {
 			throw new Error(`Cannot find tmux pane ${tmuxPaneId}`);
 		}
 
-		// Use new-session -t to create a linked session (independent view of same windows).
-		// This way we don't interfere with existing clients' active window/pane.
-		// The linked session name is unique per proxy session.
-		const linkedName = `_genie_proxy_${sessionId.slice(0, 8)}`;
+		const controlSession = getOrCreateControl(sessionName);
 
-		const proc = pty.spawn(
-			'tmux',
-			[
-				'new-session',
-				'-d',
-				'-t',
-				sessionName,
-				'-s',
-				linkedName,
-				';',
-				'select-window',
-				'-t',
-				tmuxPaneId,
-				';',
-				'select-pane',
-				'-t',
-				tmuxPaneId,
-				';',
-				'attach-session',
-				'-t',
-				linkedName,
-			],
-			{
-				name: 'xterm-256color',
-				cols,
-				rows,
-				cwd: process.env.HOME || '/home/genie',
-				env: {
-					...(process.env as Record<string, string>),
-					TERM: 'xterm-256color',
-					COLORTERM: 'truecolor',
-				},
-			}
-		);
+		// Register output listener filtered to this pane
+		const outputHandler = (paneId: string, data: Buffer) => {
+			if (paneId !== tmuxPaneId) return;
+			nc.publish(`${PREFIX}.${sessionId}.data`, JSON.stringify({ sessionId, data: data.toString('base64') }));
+		};
+		controlSession.on('output', outputHandler);
 
 		const session: ProxySession = {
 			sessionId,
 			tmuxPaneId,
-			linkedSessionName: linkedName,
-			process: proc,
-			buffer: [],
-			bufferBytes: 0,
+			tmuxSessionName: sessionName,
+			controlSession,
+			outputHandler,
 		};
-
-		// PTY output → buffer + publish to NATS
-		proc.onData((data: string) => {
-			addToBuffer(session, data);
-			nc.publish(
-				`${PREFIX}.${sessionId}.data`,
-				JSON.stringify({ sessionId, data: Buffer.from(data, 'utf8').toString('base64') })
-			);
-		});
-
-		// PTY exit → cleanup linked session + notify
-		proc.onExit(({ exitCode, signal }) => {
-			// Always kill the linked tmux session when PTY dies
-			try {
-				execSync(`tmux kill-session -t '${linkedName}'`, { timeout: 3000 });
-			} catch {
-				// already gone
-			}
-			nc.publish(`${PREFIX}.${sessionId}.exit`, JSON.stringify({ sessionId, code: exitCode, signal }));
-			sessions.delete(sessionId);
-		});
-
 		sessions.set(sessionId, session);
+
+		// Set initial size
+		controlSession.resizeClient(cols, rows);
+
+		// Initial buffer fill via capture-pane
+		try {
+			const content = tmux.capturePane(tmuxPaneId);
+			if (content) {
+				nc.publish(
+					`${PREFIX}.${sessionId}.buffer`,
+					JSON.stringify({ sessionId, data: Buffer.from(content, 'utf-8').toString('base64') })
+				);
+				nc.publish(`${PREFIX}.${sessionId}.buffer-end`, JSON.stringify({ sessionId }));
+			}
+		} catch {
+			// capture errors are non-fatal
+		}
+
 		return sessionId;
 	}
 
 	function destroy(sessionId: string): boolean {
 		const session = sessions.get(sessionId);
 		if (!session) return false;
-		try {
-			session.process.kill();
-		} catch {
-			// already dead
-		}
-		// Clean up the linked tmux session
-		try {
-			execSync(`tmux kill-session -t '${session.linkedSessionName}'`, { timeout: 3000 });
-		} catch {
-			// already gone
-		}
+
+		// Unregister the output listener
+		session.controlSession.removeListener('output', session.outputHandler);
 		sessions.delete(sessionId);
+
+		// Release control session (detaches when refcount hits zero)
+		releaseControl(session.tmuxSessionName);
+
 		return true;
 	}
 
 	function write(sessionId: string, data: string): void {
 		const session = sessions.get(sessionId);
-		if (session) session.process.write(data);
+		if (session) {
+			session.controlSession.sendKeys(session.tmuxPaneId, data);
+		}
 	}
 
 	function resize(sessionId: string, cols: number, rows: number): void {
 		const session = sessions.get(sessionId);
-		if (session) session.process.resize(Math.max(1, cols), Math.max(1, rows));
+		if (session) {
+			session.controlSession.resizeClient(Math.max(1, cols), Math.max(1, rows));
+		}
 	}
 
 	function replay(sessionId: string): void {
 		const session = sessions.get(sessionId);
 		if (!session) return;
-		for (const chunk of session.buffer) {
-			nc.publish(`${PREFIX}.${sessionId}.buffer`, JSON.stringify({ sessionId, data: chunk.toString('base64') }));
+
+		try {
+			const content = tmux.capturePane(session.tmuxPaneId);
+			if (content) {
+				nc.publish(
+					`${PREFIX}.${sessionId}.buffer`,
+					JSON.stringify({ sessionId, data: Buffer.from(content, 'utf-8').toString('base64') })
+				);
+			}
+		} catch {
+			// capture errors are non-fatal
 		}
 		nc.publish(`${PREFIX}.${sessionId}.buffer-end`, JSON.stringify({ sessionId }));
 	}
 
 	function shutdown(): void {
-		for (const sessionId of sessions.keys()) {
+		// Destroy all proxy sessions
+		for (const sessionId of [...sessions.keys()]) {
 			destroy(sessionId);
 		}
+		// Detach any remaining control sessions
+		for (const [, entry] of controlSessions) {
+			entry.controlSession.detach();
+		}
+		controlSessions.clear();
 	}
 
 	return { create, destroy, write, resize, replay, shutdown };

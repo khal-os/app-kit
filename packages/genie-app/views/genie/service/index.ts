@@ -44,7 +44,7 @@ createService({
 	onReady: (_nc: NatsConnection) => {
 		nc = _nc;
 		tmux = new TmuxControl();
-		termProxy = createTerminalProxy(nc);
+		termProxy = createTerminalProxy(nc, tmux);
 
 		// Start event stream for real-time notifications
 		// Event stream disabled — polling is sufficient and avoids
