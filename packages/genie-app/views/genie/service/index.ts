@@ -46,13 +46,10 @@ createService({
 		tmux = new TmuxControl();
 		termProxy = createTerminalProxy(nc, tmux);
 
-		// Start event stream for real-time notifications
-		// Event stream disabled — polling is sufficient and avoids
-		// feedback loops from proxy session creation triggering events
+		// Event stream disabled — polling is sufficient for the dashboard refresh cycle
 	},
 
 	onShutdown: () => {
-		tmux?.disconnect();
 		termProxy?.shutdown();
 	},
 
