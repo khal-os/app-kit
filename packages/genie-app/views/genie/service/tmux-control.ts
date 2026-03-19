@@ -207,8 +207,6 @@ function tmuxExec(args: string): string {
 }
 
 export class TmuxControl extends EventEmitter {
-	private controlProc: ChildProcess | null = null;
-
 	/**
 	 * List all tmux sessions.
 	 */
@@ -307,57 +305,6 @@ export class TmuxControl extends EventEmitter {
 		const escaped = keys.replace(/'/g, "'\\''");
 		tmuxExec(`send-keys -t '${paneId}' -l '${escaped}'`);
 		tmuxExec(`send-keys -t '${paneId}' Enter`);
-	}
-
-	/**
-	 * Start control mode for event streaming (optional).
-	 * Emits 'notification' events for structural changes.
-	 */
-	startEventStream(): void {
-		if (this.controlProc) return;
-
-		this.controlProc = spawn('tmux', ['-C', 'new-session', '-d', '-s', '_genie_events'], {
-			stdio: ['pipe', 'pipe', 'pipe'],
-			env: { ...process.env, LC_ALL: 'C.UTF-8', LANG: 'C.UTF-8' },
-		});
-
-		const rl = readline.createInterface({ input: this.controlProc.stdout! });
-
-		rl.on('line', (line) => {
-			if (!line.startsWith('%')) return;
-			if (line.startsWith('%begin') || line.startsWith('%end') || line.startsWith('%error')) return;
-
-			const parts = line.split(' ');
-			const type = parts[0].slice(1);
-			const args = parts.slice(1);
-			this.emit(type, ...args);
-		});
-
-		this.controlProc.on('close', () => {
-			this.controlProc = null;
-			// Clean up the ephemeral session
-			try {
-				tmuxExec('kill-session -t _genie_events');
-			} catch {
-				// already gone
-			}
-		});
-	}
-
-	/**
-	 * Disconnect event stream.
-	 */
-	disconnect(): void {
-		if (this.controlProc) {
-			this.controlProc.stdin?.end();
-			this.controlProc.kill();
-			this.controlProc = null;
-		}
-		try {
-			tmuxExec('kill-session -t _genie_events');
-		} catch {
-			// already gone
-		}
 	}
 
 	/**
