@@ -30,5 +30,7 @@ export {
 	O11Y_SUBJECT_LOGS,
 	O11Y_SUBJECT_TRACES,
 } from './service/o11y-streams';
-export type { Msg, NatsConnection, ServiceConfig, ServiceHandler } from './service/runtime';
+export type { Msg, NatsConnection, ObserveConfig, ServiceConfig, ServiceHandler } from './service/runtime';
 export { createService } from './service/runtime';
+export type { TraceContext } from './service/trace';
+export { extractTrace, injectTrace, newSpan, PARENT_SPAN_HEADER, SPAN_HEADER, TRACE_HEADER } from './service/trace';

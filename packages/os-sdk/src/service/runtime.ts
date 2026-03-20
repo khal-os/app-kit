@@ -9,7 +9,7 @@
  *     subscriptions: [
  *       { subject: 'os.myapp.foo', handler: (msg, nc) => { ... } },
  *     ],
- *     onReady: async (nc) => { console.log('ready'); },
+ *     onReady: async (nc, log) => { log.info('ready'); },
  *     onShutdown: async () => { ... },
  *   });
  */
@@ -17,6 +17,10 @@
 import type { Msg } from '@nats-io/nats-core';
 import { connect, type NatsConnection } from '@nats-io/transport-node';
 import { NATS_URL } from '../config';
+import { interceptConsole } from './console-intercept';
+import type { Logger } from './logger';
+import { createLogger } from './logger';
+import { extractTrace, newSpan } from './trace';
 
 // Re-export types so callers don't need to import from @nats-io directly.
 export type { NatsConnection, Msg };
@@ -32,6 +36,16 @@ export interface ServiceHandler {
 }
 
 /**
+ * Observability configuration for auto-instrumentation.
+ */
+export interface ObserveConfig {
+	/** Additional subject patterns to exclude from auto-capture. */
+	exclude?: string[];
+	/** Minimum log level (default: 'info'). */
+	level?: string;
+}
+
+/**
  * Configuration for a managed NATS service.
  */
 export interface ServiceConfig {
@@ -39,10 +53,78 @@ export interface ServiceConfig {
 	name: string;
 	/** Subscriptions to set up after connecting. */
 	subscriptions?: ServiceHandler[];
-	/** Called once after all subscriptions are registered. */
-	onReady?: (nc: NatsConnection) => void | Promise<void>;
+	/** Called once after all subscriptions are registered. Receives logger as second arg (backward compatible). */
+	onReady?: (nc: NatsConnection, log: Logger) => void | Promise<void>;
 	/** Called during graceful shutdown before draining NATS. */
 	onShutdown?: () => void | Promise<void>;
+	/** Observability config for auto-instrumentation. */
+	observe?: ObserveConfig;
+}
+
+/** Default subject patterns excluded from handler event auto-capture. */
+const DEFAULT_EXCLUDE_PATTERNS = ['os.o11y.*', '*.data', '*.input', '*.resize', 'os.pty.*'];
+
+/**
+ * Check if a NATS subject matches any exclusion pattern.
+ * Supports `*` as a single-token wildcard and `>` as a multi-token wildcard.
+ */
+function matchesExclusion(subject: string, patterns: string[]): boolean {
+	for (const pattern of patterns) {
+		if (matchPattern(subject, pattern)) return true;
+	}
+	return false;
+}
+
+function matchPattern(subject: string, pattern: string): boolean {
+	const subParts = subject.split('.');
+	const patParts = pattern.split('.');
+
+	for (let i = 0; i < patParts.length; i++) {
+		const pat = patParts[i];
+		if (pat === '>') return true; // multi-token wildcard matches rest
+		if (i >= subParts.length) return false;
+		if (pat !== '*' && pat !== subParts[i]) return false;
+	}
+
+	return subParts.length === patParts.length;
+}
+
+/** Spawn the async message loop for a subscription. */
+function spawnMessageLoop(
+	sub: AsyncIterable<Msg>,
+	shouldInstrument: boolean,
+	nc: NatsConnection,
+	log: Logger,
+	serviceName: string,
+	subject: string,
+	handler: (msg: Msg, nc: NatsConnection) => void | Promise<void>
+): void {
+	(async () => {
+		for await (const msg of sub) {
+			if (shouldInstrument) {
+				await instrumentedHandler(nc, log, serviceName, subject, msg, handler);
+			} else {
+				await plainHandler(log, subject, msg, handler, nc);
+			}
+		}
+	})();
+}
+
+/** Handle a message without instrumentation, just error catching. */
+async function plainHandler(
+	log: Logger,
+	subject: string,
+	msg: Msg,
+	handler: (msg: Msg, nc: NatsConnection) => void | Promise<void>,
+	nc: NatsConnection
+): Promise<void> {
+	try {
+		await handler(msg, nc);
+	} catch (err) {
+		log.error(`handler error on ${subject}`, {
+			error: err instanceof Error ? err : new Error(String(err)),
+		});
+	}
 }
 
 /**
@@ -52,32 +134,33 @@ export interface ServiceConfig {
  * Errors during startup cause process.exit(1) via the .catch() wrapper.
  */
 export async function createService(config: ServiceConfig): Promise<void> {
-	const { name, subscriptions = [], onReady, onShutdown } = config;
+	const { name, subscriptions = [], onReady, onShutdown, observe } = config;
 
 	const nc = await connect({ servers: NATS_URL });
-	console.log(`[${name}] connected to NATS (${NATS_URL})`);
+
+	// Create structured logger and intercept console for this service.
+	const log = createLogger(name, nc);
+	const _restoreConsole = interceptConsole(log);
+
+	log.info(`connected to NATS (${NATS_URL})`);
+
+	// Build merged exclusion list for auto-capture.
+	const excludePatterns = [...DEFAULT_EXCLUDE_PATTERNS, ...(observe?.exclude ?? [])];
 
 	// Register all subscriptions and spawn async iterators.
 	const subs = subscriptions.map(({ subject, handler }) => {
 		const sub = nc.subscribe(subject);
-		console.log(`[${name}] subscribed to ${subject}`);
+		log.info(`subscribed to ${subject}`);
 
-		(async () => {
-			for await (const msg of sub) {
-				try {
-					await handler(msg, nc);
-				} catch (err) {
-					console.error(`[${name}] handler error on ${subject}:`, err);
-				}
-			}
-		})();
+		const shouldInstrument = !matchesExclusion(subject, excludePatterns);
+		spawnMessageLoop(sub, shouldInstrument, nc, log, name, subject, handler);
 
 		return sub;
 	});
 
 	// Notify the service that everything is wired up.
 	if (onReady) {
-		await onReady(nc);
+		await onReady(nc, log);
 	}
 
 	// Graceful shutdown — guard against being called twice (e.g. SIGINT + SIGTERM).
@@ -87,7 +170,7 @@ export async function createService(config: ServiceConfig): Promise<void> {
 		if (shuttingDown) return;
 		shuttingDown = true;
 
-		console.log(`[${name}] shutting down...`);
+		log.info('shutting down...');
 
 		for (const sub of subs) {
 			sub.unsubscribe();
@@ -97,9 +180,13 @@ export async function createService(config: ServiceConfig): Promise<void> {
 			try {
 				await onShutdown();
 			} catch (err) {
-				console.error(`[${name}] onShutdown error:`, err);
+				log.error('onShutdown error', {
+					error: err instanceof Error ? err : new Error(String(err)),
+				});
 			}
 		}
+
+		_restoreConsole();
 
 		// drain() waits for in-flight messages before closing — safer than close().
 		await nc.drain();
@@ -111,4 +198,62 @@ export async function createService(config: ServiceConfig): Promise<void> {
 
 	// Keep the process alive until NATS connection closes.
 	await nc.closed();
+}
+
+/**
+ * Wraps a handler invocation with observability: trace extraction, timing, and event emission.
+ */
+async function instrumentedHandler(
+	nc: NatsConnection,
+	log: Logger,
+	serviceName: string,
+	subject: string,
+	msg: Msg,
+	handler: (msg: Msg, nc: NatsConnection) => void | Promise<void>
+): Promise<void> {
+	// Extract or generate trace context.
+	const inbound = extractTrace(msg);
+	const span = newSpan(inbound.traceId);
+	if (inbound.spanId) {
+		span.parentSpanId = inbound.spanId;
+	}
+
+	const payloadBytes = msg.data?.length ?? 0;
+	const start = performance.now();
+	let error: { message: string; stack?: string } | undefined;
+
+	try {
+		await handler(msg, nc);
+	} catch (err) {
+		const e = err instanceof Error ? err : new Error(String(err));
+		error = { message: e.message, stack: e.stack };
+		log.error(`handler error on ${subject}`, {
+			error: e,
+			trace_id: span.traceId,
+			span_id: span.spanId,
+		});
+	}
+
+	const durationMs = Math.round((performance.now() - start) * 100) / 100;
+
+	// Emit observability event (fire-and-forget).
+	const event = {
+		subject,
+		service: serviceName,
+		duration_ms: durationMs,
+		payload_bytes: payloadBytes,
+		trace_id: span.traceId,
+		span_id: span.spanId,
+		parent_span_id: span.parentSpanId,
+		ts: new Date().toISOString(),
+		...(error ? { error } : {}),
+	};
+
+	// Publish to subject-domain stream: os.o11y.events.<original-subject>
+	const eventSubject = `os.o11y.events.${subject}`;
+	try {
+		nc.publish(eventSubject, JSON.stringify(event));
+	} catch {
+		// Never let observability failures affect service operation.
+	}
 }
