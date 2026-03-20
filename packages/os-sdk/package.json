@@ -1,0 +1,26 @@
+{
+	"name": "@genie-os/sdk",
+	"version": "0.0.1",
+	"private": true,
+	"main": "./src/index.ts",
+	"exports": {
+		".": "./src/index.ts",
+		"./config": "./src/config.ts",
+		"./service": "./src/service/runtime.ts",
+		"./service/logger": "./src/service/logger.ts",
+		"./service/console-intercept": "./src/service/console-intercept.ts",
+		"./service/o11y-streams": "./src/service/o11y-streams.ts",
+		"./db": "./src/db/factory.ts",
+		"./db/migrate": "./src/db/migrate.ts",
+		"./db/provision": "./src/db/provision.ts"
+	},
+	"peerDependencies": {
+		"@nats-io/jetstream": ">=3",
+		"@nats-io/nats-core": ">=3",
+		"@nats-io/transport-node": ">=3",
+		"@workos-inc/authkit-nextjs": ">=2",
+		"drizzle-orm": ">=0.45",
+		"next": ">=16",
+		"postgres": ">=3"
+	}
+}

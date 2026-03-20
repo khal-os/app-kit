@@ -1,0 +1,29 @@
+{
+	"name": "@genie-os/genie-app",
+	"version": "0.0.1",
+	"private": true,
+	"main": "./manifest.ts",
+	"exports": {
+		".": "./manifest.ts",
+		"./components": "./components.ts",
+		"./views/*": "./views/*"
+	},
+	"genieOs": {
+		"services": [
+			{
+				"name": "genie-control",
+				"entry": "./views/genie/service/index.ts",
+				"runtime": "node"
+			}
+		]
+	},
+	"dependencies": {
+		"react-grid-layout": "^1.5.0"
+	},
+	"devDependencies": {
+		"@types/react-grid-layout": "^1.3.5"
+	},
+	"peerDependencies": {
+		"react": ">=19"
+	}
+}
