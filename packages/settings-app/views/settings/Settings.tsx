@@ -84,6 +84,12 @@ const CONCEPT_OPTIONS: Array<{
 	colors: string[];
 }> = [
 	{
+		id: 'genie',
+		name: 'Genie',
+		description: 'The default — blue accent, clean glass, dark mockup palette',
+		colors: ['#3b82f6', '#60a5fa', '#0a0a0f'],
+	},
+	{
 		id: 'glass-office',
 		name: 'Glass Office',
 		description: 'Heavy frosted glass, translucent surfaces, indigo glow',
