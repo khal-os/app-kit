@@ -1,4 +1,5 @@
 'use client';
+// NOTE: This component connects to tmux panes via control mode (server-side). It does NOT create proxy sessions. NEVER introduce node-pty, _genie_proxy_*, or linked tmux sessions here.
 
 import type { FitAddon } from '@xterm/addon-fit';
 import type { WebglAddon } from '@xterm/addon-webgl';

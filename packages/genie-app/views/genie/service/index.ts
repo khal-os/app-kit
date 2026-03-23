@@ -44,15 +44,12 @@ createService({
 	onReady: (_nc: NatsConnection) => {
 		nc = _nc;
 		tmux = new TmuxControl();
-		termProxy = createTerminalProxy(nc);
+		termProxy = createTerminalProxy(nc, tmux);
 
-		// Start event stream for real-time notifications
-		// Event stream disabled — polling is sufficient and avoids
-		// feedback loops from proxy session creation triggering events
+		// Event stream disabled — polling is sufficient for the dashboard refresh cycle
 	},
 
 	onShutdown: () => {
-		tmux?.disconnect();
 		termProxy?.shutdown();
 	},
 
@@ -62,8 +59,7 @@ createService({
 			subject: 'os.genie.agents.list',
 			handler: (msg) => {
 				try {
-					// Filter out proxy sessions from the list
-					const sessions = tmux.listSessions().filter((s) => !s.name.startsWith('_genie_'));
+					const sessions = tmux.listSessions();
 					const windows = tmux.listWindows();
 					const panes = tmux.listPanes();
 					const registry = loadAgentRegistry();

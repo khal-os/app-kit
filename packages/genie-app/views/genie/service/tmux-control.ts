@@ -1,11 +1,171 @@
 /**
  * tmux client — uses direct exec for queries (reliable) and
- * optional control mode for event streaming.
+ * control mode for pane I/O streaming + event notifications.
  */
 
 import { type ChildProcess, execSync, spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import * as readline from 'node:readline';
+
+function isOctalDigit(ch: string): boolean {
+	return ch >= '0' && ch <= '7';
+}
+
+function pushUtf8Bytes(bytes: number[], code: number): void {
+	if (code <= 0x7f) {
+		bytes.push(code);
+	} else if (code <= 0x7ff) {
+		bytes.push(0xc0 | (code >> 6), 0x80 | (code & 0x3f));
+	} else if (code <= 0xffff) {
+		bytes.push(0xe0 | (code >> 12), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+	} else {
+		bytes.push(0xf0 | (code >> 18), 0x80 | ((code >> 12) & 0x3f), 0x80 | ((code >> 6) & 0x3f), 0x80 | (code & 0x3f));
+	}
+}
+
+/**
+ * Decode tmux control mode octal escape format.
+ * - \ooo → byte value (3-digit octal)
+ * - \\ → literal backslash
+ * - All other characters pass through as UTF-8
+ */
+export function decodeOctalEscapes(input: string): Buffer {
+	const bytes: number[] = [];
+	let i = 0;
+	while (i < input.length) {
+		if (input[i] === '\\' && i + 1 < input.length) {
+			if (input[i + 1] === '\\') {
+				bytes.push(0x5c);
+				i += 2;
+			} else if (
+				i + 3 < input.length &&
+				isOctalDigit(input[i + 1]) &&
+				isOctalDigit(input[i + 2]) &&
+				isOctalDigit(input[i + 3])
+			) {
+				bytes.push(Number.parseInt(input.substring(i + 1, i + 4), 8));
+				i += 4;
+			} else {
+				bytes.push(input.charCodeAt(i));
+				i++;
+			}
+		} else {
+			const code = input.codePointAt(i)!;
+			pushUtf8Bytes(bytes, code);
+			i += code > 0xffff ? 2 : 1;
+		}
+	}
+	return Buffer.from(bytes);
+}
+
+/**
+ * A control mode connection to a single tmux session.
+ * Emits 'output' events with (paneId, data) for all panes in the session.
+ * Emits 'exit' when the control connection ends.
+ */
+export class ControlSession extends EventEmitter {
+	private proc: ChildProcess | null = null;
+	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+	private _connected = false;
+	private _detached = false;
+
+	constructor(readonly sessionName: string) {
+		super();
+		this.connect();
+	}
+
+	get connected(): boolean {
+		return this._connected;
+	}
+
+	private connect(): void {
+		if (this._detached) return;
+
+		// Double -C disables echo of input commands
+		this.proc = spawn('tmux', ['-CC', 'attach-session', '-t', this.sessionName], {
+			stdio: ['pipe', 'pipe', 'pipe'],
+			env: { ...process.env, LC_ALL: 'C.UTF-8', LANG: 'C.UTF-8' },
+		});
+
+		const rl = readline.createInterface({ input: this.proc.stdout! });
+
+		rl.on('line', (line) => {
+			if (!line.startsWith('%')) return;
+
+			if (line.startsWith('%output ')) {
+				this.handleOutput(line);
+			} else if (line.startsWith('%exit')) {
+				this._connected = false;
+				this.emit('exit', line.slice(6).trim());
+			}
+			// Ignore %begin, %end, %error — those are command responses
+		});
+
+		this.proc.on('close', (code) => {
+			this._connected = false;
+			this.proc = null;
+			if (!this._detached) {
+				// Auto-reconnect after 1 second
+				this.reconnectTimer = setTimeout(() => this.connect(), 1000);
+			}
+			this.emit('close', code);
+		});
+
+		this._connected = true;
+	}
+
+	private handleOutput(line: string): void {
+		// Format: %output %<pane_id> <data>
+		// Find pane ID: starts after "%output " and is like "%0", "%42"
+		const afterOutput = line.substring(8); // skip "%output "
+		const spaceIdx = afterOutput.indexOf(' ');
+		if (spaceIdx === -1) return;
+
+		const paneId = afterOutput.substring(0, spaceIdx);
+		const rawData = afterOutput.substring(spaceIdx + 1);
+		const data = decodeOctalEscapes(rawData);
+		this.emit('output', paneId, data);
+	}
+
+	/**
+	 * Send raw input bytes to a pane using hex mode.
+	 * Converts each byte to two-digit hex for send-keys -H.
+	 */
+	sendKeys(paneId: string, data: string): void {
+		if (!this.proc?.stdin?.writable) return;
+		const buf = Buffer.from(data, 'utf-8');
+		const hex = Array.from(buf)
+			.map((b) => b.toString(16).padStart(2, '0'))
+			.join(' ');
+		this.proc.stdin.write(`send-keys -H -t '${paneId}' ${hex}\n`);
+	}
+
+	/**
+	 * Resize the control client's view.
+	 */
+	resizeClient(cols: number, rows: number): void {
+		if (!this.proc?.stdin?.writable) return;
+		this.proc.stdin.write(`refresh-client -C ${cols},${rows}\n`);
+	}
+
+	/**
+	 * Detach and clean up the control connection.
+	 */
+	detach(): void {
+		this._detached = true;
+		if (this.reconnectTimer) {
+			clearTimeout(this.reconnectTimer);
+			this.reconnectTimer = null;
+		}
+		if (this.proc) {
+			this.proc.stdin?.end();
+			this.proc.kill();
+			this.proc = null;
+		}
+		this._connected = false;
+		this.removeAllListeners();
+	}
+}
 
 export interface TmuxSession {
 	id: string;
@@ -47,8 +207,6 @@ function tmuxExec(args: string): string {
 }
 
 export class TmuxControl extends EventEmitter {
-	private controlProc: ChildProcess | null = null;
-
 	/**
 	 * List all tmux sessions.
 	 */
@@ -150,53 +308,11 @@ export class TmuxControl extends EventEmitter {
 	}
 
 	/**
-	 * Start control mode for event streaming (optional).
-	 * Emits 'notification' events for structural changes.
+	 * Attach to an existing tmux session in control mode.
+	 * Returns a ControlSession that streams pane output and accepts input.
+	 * Creates zero additional tmux sessions.
 	 */
-	startEventStream(): void {
-		if (this.controlProc) return;
-
-		this.controlProc = spawn('tmux', ['-C', 'new-session', '-d', '-s', '_genie_events'], {
-			stdio: ['pipe', 'pipe', 'pipe'],
-			env: { ...process.env, LC_ALL: 'C.UTF-8', LANG: 'C.UTF-8' },
-		});
-
-		const rl = readline.createInterface({ input: this.controlProc.stdout! });
-
-		rl.on('line', (line) => {
-			if (!line.startsWith('%')) return;
-			if (line.startsWith('%begin') || line.startsWith('%end') || line.startsWith('%error')) return;
-
-			const parts = line.split(' ');
-			const type = parts[0].slice(1);
-			const args = parts.slice(1);
-			this.emit(type, ...args);
-		});
-
-		this.controlProc.on('close', () => {
-			this.controlProc = null;
-			// Clean up the ephemeral session
-			try {
-				tmuxExec('kill-session -t _genie_events');
-			} catch {
-				// already gone
-			}
-		});
-	}
-
-	/**
-	 * Disconnect event stream.
-	 */
-	disconnect(): void {
-		if (this.controlProc) {
-			this.controlProc.stdin?.end();
-			this.controlProc.kill();
-			this.controlProc = null;
-		}
-		try {
-			tmuxExec('kill-session -t _genie_events');
-		} catch {
-			// already gone
-		}
+	attachSession(sessionName: string): ControlSession {
+		return new ControlSession(sessionName);
 	}
 }

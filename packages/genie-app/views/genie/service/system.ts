@@ -31,7 +31,7 @@ function parseDoctorOutput(text: string): DoctorResult {
 	};
 
 	// Strip ANSI escape codes
-	// biome-ignore lint/suspicious/noControlCharactersInRegex: stripping ANSI escape codes requires matching control characters
+	// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape stripping requires matching \x1b
 	const clean = text.replace(/\x1b\[[0-9;]*m/g, '');
 
 	let currentSection: keyof DoctorResult | null = null;
