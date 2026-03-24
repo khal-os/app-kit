@@ -1,5 +1,5 @@
 {
-	"name": "@genie-os/nats-viewer-app",
+	"name": "@khal-os/nats-viewer-app",
 	"version": "0.0.1",
 	"private": true,
 	"main": "./manifest.ts",

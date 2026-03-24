@@ -1,5 +1,5 @@
-import type { NatsConnection } from '@genie-os/sdk/service';
-import { createService } from '@genie-os/sdk/service';
+import type { NatsConnection } from '@khal-os/sdk/service';
+import { createService } from '@khal-os/sdk/service';
 import { agentLifecycleHandlers } from './agent-lifecycle';
 import { commsHandlers } from './comms';
 import { directorySubscriptions } from './directory';

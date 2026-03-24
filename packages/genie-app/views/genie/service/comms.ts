@@ -9,7 +9,7 @@
  *   os.genie.comms.chat.read  — read team chat history
  */
 
-import type { ServiceHandler } from '@genie-os/sdk/service';
+import type { ServiceHandler } from '@khal-os/sdk/service';
 import { SUBJECTS } from '../../../lib/subjects';
 import { runGenie } from './cli';
 

@@ -64,7 +64,7 @@ export function Settings(_props: { windowId: string; meta?: Record<string, unkno
 				</SplitPane>
 			</div>
 			<StatusBar>
-				<StatusBar.Item>Genie OS</StatusBar.Item>
+				<StatusBar.Item>Khal OS</StatusBar.Item>
 				<StatusBar.Spacer />
 				<StatusBar.Item variant="success">local</StatusBar.Item>
 			</StatusBar>
@@ -222,7 +222,7 @@ function AboutTab() {
 	return (
 		<div className="flex max-w-2xl flex-col gap-8 text-gray-1000">
 			<section>
-				<SectionHeader title="Genie OS" description="Desktop-in-browser OS shell." />
+				<SectionHeader title="Khal OS" description="Desktop-in-browser OS shell." />
 				<PropertyPanel className="rounded-lg border border-gray-alpha-200">
 					<PropertyPanel.Section>
 						<PropertyPanel.Row label="Version">v2-dev</PropertyPanel.Row>

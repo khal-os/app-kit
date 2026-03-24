@@ -16,7 +16,7 @@ import { UploadOverlay } from './UploadOverlay';
 import { useFiles } from './use-files';
 import { useUpload } from './use-upload';
 
-const VIEW_MODE_KEY = 'genie-os-files-view-mode';
+const VIEW_MODE_KEY = 'khal-os-files-view-mode';
 
 function getStoredViewMode(): ViewMode {
 	if (typeof window === 'undefined') return 'grid';

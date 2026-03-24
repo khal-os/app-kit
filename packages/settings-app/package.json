@@ -1,5 +1,5 @@
 {
-	"name": "@genie-os/settings-app",
+	"name": "@khal-os/settings-app",
 	"version": "0.0.1",
 	"private": true,
 	"main": "./manifest.ts",
