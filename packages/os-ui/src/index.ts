@@ -19,6 +19,11 @@ export * from '@/components/ui/switch';
 export * from '@/components/ui/theme-provider';
 export * from '@/components/ui/theme-switcher';
 export * from '@/components/ui/tooltip';
+// Design system components
+export * from '@/components/ui/glass-card';
+export * from '@/components/ui/status-dot';
+export * from '@/components/ui/progress-bar';
+export * from '@/components/ui/avatar';
 // Auth
 export { useKhalAuth, useKhalAuth as useOSAuth } from '@/lib/auth/use-auth';
 export { useNats, useNatsSubscription } from '@/lib/hooks/use-nats';
