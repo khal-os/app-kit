@@ -2,6 +2,7 @@ import type { NatsConnection } from '@khal-os/sdk/service';
 import { createService } from '@khal-os/sdk/service';
 import { agentLifecycleHandlers } from './agent-lifecycle';
 import { appsHandlers } from './apps';
+import { runGenieAsync } from './cli';
 import { commsHandlers } from './comms';
 import { directorySubscriptions } from './directory';
 import { systemSubscriptions } from './system';
@@ -133,18 +134,49 @@ createService({
 		// --- Spawn agent ---
 		{
 			subject: 'os.genie.spawn',
-			handler: (msg) => {
+			handler: async (msg) => {
 				try {
-					const { execSync } = require('node:child_process');
-					const req = msg.json<{ role: string; team?: string; repo?: string }>();
-					const args = [req.role];
+					const req = msg.json<{
+						role: string;
+						team?: string;
+						repo?: string;
+						provider?: string;
+						model?: string;
+						skill?: string;
+						layout?: string;
+						color?: string;
+						planMode?: boolean;
+						permissionMode?: string;
+						cwd?: string;
+						session?: string;
+					}>();
+					if (!req.role) {
+						msg.respond(JSON.stringify({ ok: false, error: 'Missing required field: role' }));
+						return;
+					}
+
+					const args = ['spawn', req.role];
 					if (req.team) args.push('--team', req.team);
-					const result = execSync(`genie spawn ${args.join(' ')}`, {
+					if (req.provider) args.push('--provider', req.provider);
+					if (req.model) args.push('--model', req.model);
+					if (req.skill) args.push('--skill', req.skill);
+					if (req.layout) args.push('--layout', req.layout);
+					if (req.color) args.push('--color', req.color);
+					if (req.planMode) args.push('--plan-mode');
+					if (req.permissionMode) args.push('--permission-mode', req.permissionMode);
+					if (req.cwd) args.push('--cwd', req.cwd);
+					if (req.session) args.push('--session', req.session);
+
+					const result = await runGenieAsync(args, {
+						json: false,
+						timeout: 15_000,
 						cwd: req.repo || process.env.HOME,
-						timeout: 15000,
-						encoding: 'utf-8',
 					});
-					msg.respond(JSON.stringify({ ok: true, output: result.trim() }));
+					if (!result.ok) {
+						msg.respond(JSON.stringify({ ok: false, error: result.error }));
+						return;
+					}
+					msg.respond(JSON.stringify({ ok: true, output: result.data }));
 				} catch (err) {
 					msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 				}
