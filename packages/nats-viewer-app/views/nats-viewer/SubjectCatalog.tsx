@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useKhalAuth } from '@/lib/auth/use-auth';
 import { useNats } from '@/lib/hooks/use-nats';
 import { SUBJECTS } from '@/lib/subjects';
 import { useNatsViewer } from './nats-viewer-context';
@@ -9,21 +10,21 @@ import { useNatsViewer } from './nats-viewer-context';
  * Build a list of known static subjects.
  * Skips session-scoped subjects like pty.data.
  */
-function buildKnownSubjects(userId: string): string[] {
+function buildKnownSubjects(orgId: string, userId: string): string[] {
 	const subjects = [
-		SUBJECTS.echo(),
-		SUBJECTS.system.health(),
-		SUBJECTS.pty.create(),
-		SUBJECTS.pty.destroy(),
-		SUBJECTS.pty.list(),
-		SUBJECTS.fs.list(),
-		SUBJECTS.fs.read(),
-		SUBJECTS.fs.write(),
-		SUBJECTS.fs.search(),
-		SUBJECTS.notify.broadcast(),
+		SUBJECTS.echo(orgId),
+		SUBJECTS.system.health(orgId),
+		SUBJECTS.pty.create(orgId),
+		SUBJECTS.pty.destroy(orgId),
+		SUBJECTS.pty.list(orgId),
+		SUBJECTS.fs.list(orgId),
+		SUBJECTS.fs.read(orgId),
+		SUBJECTS.fs.write(orgId),
+		SUBJECTS.fs.search(orgId),
+		SUBJECTS.notify.broadcast(orgId),
 	];
 	if (userId) {
-		subjects.push(SUBJECTS.desktop.cmd.all(userId), SUBJECTS.desktop.event.all(userId));
+		subjects.push(SUBJECTS.desktop.cmd.all(orgId, userId), SUBJECTS.desktop.event.all(orgId, userId));
 	}
 	return subjects.sort();
 }
@@ -31,8 +32,10 @@ function buildKnownSubjects(userId: string): string[] {
 export function SubjectCatalog() {
 	const { subscriptions, addSubscription, removeSubscription } = useNatsViewer();
 	const { userId } = useNats();
+	const auth = useKhalAuth();
+	const orgId = auth?.orgId ?? 'default';
 
-	const knownSubjects = useMemo(() => buildKnownSubjects(userId), [userId]);
+	const knownSubjects = useMemo(() => buildKnownSubjects(orgId, userId), [orgId, userId]);
 
 	return (
 		<div className="flex flex-col gap-0.5">

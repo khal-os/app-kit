@@ -5,12 +5,13 @@ import { useCallback, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
+import { useKhalAuth } from '@/lib/auth/use-auth';
 import { useNats } from '@/lib/hooks/use-nats';
 import { SUBJECTS } from '@/lib/subjects';
 import type { LogEntry } from './types';
 
-function buildQuickPickSubjects(): string[] {
-	return [SUBJECTS.echo(), SUBJECTS.pty.create(), SUBJECTS.pty.list()];
+function buildQuickPickSubjects(orgId: string): string[] {
+	return [SUBJECTS.echo(orgId), SUBJECTS.pty.create(orgId), SUBJECTS.pty.list(orgId)];
 }
 
 type RequestState =
@@ -26,7 +27,9 @@ interface RequestPanelProps {
 
 export function RequestPanel({ onMessage }: RequestPanelProps) {
 	const { connected, request } = useNats();
-	const quickPicks = useMemo(() => buildQuickPickSubjects(), []);
+	const auth = useKhalAuth();
+	const orgId = auth?.orgId ?? 'default';
+	const quickPicks = useMemo(() => buildQuickPickSubjects(orgId), [orgId]);
 
 	const [subject, setSubject] = useState('');
 	const [payload, setPayload] = useState('');
@@ -72,7 +75,7 @@ export function RequestPanel({ onMessage }: RequestPanelProps) {
 			{/* Subject input */}
 			<Input
 				size="small"
-				placeholder={SUBJECTS.echo()}
+				placeholder={SUBJECTS.echo(orgId)}
 				value={subject}
 				onChange={(e) => {
 					setSubject(e.target.value);

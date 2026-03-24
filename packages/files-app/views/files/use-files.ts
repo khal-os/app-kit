@@ -40,7 +40,7 @@ export interface UseFilesReturn {
 }
 
 export function useFiles(): UseFilesReturn {
-	const { request, subscribe, connected } = useNats();
+	const { request, subscribe, connected, orgId } = useNats();
 	const [currentPath, setCurrentPath] = useState('/');
 	const [filesRoot, setFilesRoot] = useState('');
 	const [entries, setEntries] = useState<FileEntry[]>([]);
@@ -57,7 +57,7 @@ export function useFiles(): UseFilesReturn {
 			setLoading(true);
 			setError(null);
 			try {
-				const response = (await request(SUBJECTS.fs.list(), { path })) as FileListResponse & {
+				const response = (await request(SUBJECTS.fs.list(orgId), { path })) as FileListResponse & {
 					error?: string;
 				};
 				if (response.error) {
@@ -171,7 +171,7 @@ export function useFiles(): UseFilesReturn {
 				return { ok: false, error: 'Not connected' };
 			}
 			try {
-				const response = (await request(SUBJECTS.fs.write(), op)) as FileWriteResponse;
+				const response = (await request(SUBJECTS.fs.write(orgId), op)) as FileWriteResponse;
 				if (response.ok) {
 					// Refresh after successful write
 					lastFetchedPath.current = null;
