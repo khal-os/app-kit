@@ -350,7 +350,7 @@ function AboutTab() {
 // ---------------------------------------------------------------------------
 
 function NatsEchoTab() {
-	const { connected, request } = useNats();
+	const { connected, request, orgId } = useNats();
 	const [message, setMessage] = useState('');
 	const [response, setResponse] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
@@ -362,7 +362,7 @@ function NatsEchoTab() {
 		setError(null);
 		setResponse(null);
 		try {
-			const reply = await request(SUBJECTS.echo(), { message });
+			const reply = await request(SUBJECTS.echo(orgId), { message });
 			setResponse(JSON.stringify(reply, null, 2));
 		} catch (err) {
 			setError(err instanceof Error ? err.message : String(err));

@@ -113,7 +113,7 @@ export function TerminalPane({
 	// Capture initial ptySessionId -- don't re-run effect when our own onSessionIdChange updates it
 	const ptySessionIdRef = useRef(ptySessionId);
 
-	const { subscribe, publish, request } = useNats();
+	const { subscribe, publish, request, orgId } = useNats();
 
 	// Setup terminal instance
 	useEffect(() => {
@@ -191,7 +191,7 @@ export function TerminalPane({
 			if (cancelled) return;
 
 			// Create or reattach PTY session via NATS
-			const response = (await request(SUBJECTS.pty.create(), {
+			const response = (await request(SUBJECTS.pty.create(orgId), {
 				sessionId: ptySessionIdRef.current || undefined,
 				cols,
 				rows,
@@ -214,7 +214,7 @@ export function TerminalPane({
 				const finalKey = `${settled.cols}x${settled.rows}`;
 				if (lastSentDimsRef.current === finalKey) return;
 				lastSentDimsRef.current = finalKey;
-				publish(SUBJECTS.pty.resize(sessionIdRef.current), {
+				publish(SUBJECTS.pty.resize(orgId, sessionIdRef.current), {
 					sessionId: sessionIdRef.current,
 					cols: settled.cols,
 					rows: settled.rows,
@@ -226,7 +226,7 @@ export function TerminalPane({
 			}
 
 			// Subscribe to data (live output from PTY)
-			const unsubData = subscribe(SUBJECTS.pty.data(resolvedSessionId), (msg: unknown) => {
+			const unsubData = subscribe(SUBJECTS.pty.data(orgId, resolvedSessionId), (msg: unknown) => {
 				if (cancelled) return;
 				const { data } = msg as { sessionId: string; data: string };
 				const bytes = decodeBase64(data);
@@ -260,7 +260,7 @@ export function TerminalPane({
 			// for new sessions prevents the creator from re-displaying already-visible
 			// output when other tabs replay.
 			if (!response.created) {
-				const unsubBuffer = subscribe(SUBJECTS.pty.buffer(resolvedSessionId), (msg: unknown) => {
+				const unsubBuffer = subscribe(SUBJECTS.pty.buffer(orgId, resolvedSessionId), (msg: unknown) => {
 					if (cancelled) return;
 					const { data } = msg as { sessionId: string; data: string };
 					const bytes = decodeBase64(data);
@@ -268,7 +268,7 @@ export function TerminalPane({
 				});
 				unsubsRef.current.push(unsubBuffer);
 
-				const unsubBufferEnd = subscribe(SUBJECTS.pty.bufferEnd(resolvedSessionId), (msg: unknown) => {
+				const unsubBufferEnd = subscribe(SUBJECTS.pty.bufferEnd(orgId, resolvedSessionId), (msg: unknown) => {
 					if (cancelled) return;
 					const { error } = (msg as { error?: string }) || {};
 					if (error) {
@@ -284,7 +284,7 @@ export function TerminalPane({
 						resizeTimerRef.current = setTimeout(() => {
 							if (cancelled || !sessionIdRef.current) return;
 							lastSentDimsRef.current = dimsKey;
-							publish(SUBJECTS.pty.resize(resolvedSessionId), {
+							publish(SUBJECTS.pty.resize(orgId, resolvedSessionId), {
 								sessionId: resolvedSessionId,
 								cols,
 								rows,
@@ -311,13 +311,13 @@ export function TerminalPane({
 				unsubsRef.current.push(unsubBufferEnd);
 
 				// Request buffer replay now that subscriptions are in place
-				publish(SUBJECTS.pty.replay(resolvedSessionId), {
+				publish(SUBJECTS.pty.replay(orgId, resolvedSessionId), {
 					sessionId: resolvedSessionId,
 				});
 			}
 
 			// Subscribe to exit (always — both new and reattached sessions)
-			const unsubExit = subscribe(SUBJECTS.pty.exit(resolvedSessionId), (msg: unknown) => {
+			const unsubExit = subscribe(SUBJECTS.pty.exit(orgId, resolvedSessionId), (msg: unknown) => {
 				if (cancelled) return;
 				const { code } = msg as { sessionId: string; code: number; signal?: string };
 				terminal.write(`\r\n\x1b[33m[Process exited with code ${code ?? 0}]\x1b[0m\r\n`);
@@ -327,7 +327,7 @@ export function TerminalPane({
 			// Terminal input -> NATS
 			terminal.onData((data) => {
 				if (cancelled) return;
-				publish(SUBJECTS.pty.input(resolvedSessionId), {
+				publish(SUBJECTS.pty.input(orgId, resolvedSessionId), {
 					sessionId: resolvedSessionId,
 					data,
 				});
@@ -352,7 +352,7 @@ export function TerminalPane({
 
 			terminal.onBinary((data) => {
 				if (cancelled) return;
-				publish(SUBJECTS.pty.input(resolvedSessionId), {
+				publish(SUBJECTS.pty.input(orgId, resolvedSessionId), {
 					sessionId: resolvedSessionId,
 					data,
 				});
@@ -372,7 +372,7 @@ export function TerminalPane({
 				resizeTimerRef.current = setTimeout(() => {
 					if (cancelled || !sessionIdRef.current) return;
 					lastSentDimsRef.current = dimsKey;
-					publish(SUBJECTS.pty.resize(sessionIdRef.current), {
+					publish(SUBJECTS.pty.resize(orgId, sessionIdRef.current), {
 						sessionId: sessionIdRef.current,
 						cols,
 						rows,

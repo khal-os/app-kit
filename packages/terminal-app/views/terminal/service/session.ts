@@ -49,7 +49,7 @@ function addToBuffer(session: PTYSession, data: string): void {
 	session.lastActivity = Date.now();
 }
 
-export function createSessionManager(nc: NatsConnection) {
+export function createSessionManager(nc: NatsConnection, orgId = 'default') {
 	const sessions = new Map<string, PTYSession>();
 	let cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -98,7 +98,7 @@ export function createSessionManager(nc: NatsConnection) {
 				sessionId,
 				data: Buffer.from(data, 'utf8').toString('base64'),
 			};
-			nc.publish(SUBJECTS.pty.data(sessionId), JSON.stringify(msg));
+			nc.publish(SUBJECTS.pty.data(orgId, sessionId), JSON.stringify(msg));
 		});
 
 		// PTY exit -> publish exit message + cleanup
@@ -110,7 +110,7 @@ export function createSessionManager(nc: NatsConnection) {
 				code: exitCode,
 				...(signal !== undefined ? { signal } : {}),
 			};
-			nc.publish(SUBJECTS.pty.exit(sessionId), JSON.stringify(msg));
+			nc.publish(SUBJECTS.pty.exit(orgId, sessionId), JSON.stringify(msg));
 
 			sessions.delete(sessionId);
 		});
@@ -154,7 +154,7 @@ export function createSessionManager(nc: NatsConnection) {
 			);
 			// Send buffer-end with error so the client doesn't hang
 			const endMsg: PtyBufferEndMessage = { sessionId, error: 'access_denied' };
-			nc.publish(SUBJECTS.pty.bufferEnd(sessionId), JSON.stringify(endMsg));
+			nc.publish(SUBJECTS.pty.bufferEnd(orgId, sessionId), JSON.stringify(endMsg));
 			return false;
 		}
 
@@ -164,12 +164,12 @@ export function createSessionManager(nc: NatsConnection) {
 				sessionId,
 				data: chunk.toString('base64'),
 			};
-			nc.publish(SUBJECTS.pty.buffer(sessionId), JSON.stringify(msg));
+			nc.publish(SUBJECTS.pty.buffer(orgId, sessionId), JSON.stringify(msg));
 		}
 
 		// Signal end of buffer replay
 		const endMsg: PtyBufferEndMessage = { sessionId };
-		nc.publish(SUBJECTS.pty.bufferEnd(sessionId), JSON.stringify(endMsg));
+		nc.publish(SUBJECTS.pty.bufferEnd(orgId, sessionId), JSON.stringify(endMsg));
 
 		return true;
 	}

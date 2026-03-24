@@ -4,12 +4,13 @@ import { Send } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useKhalAuth } from '@/lib/auth/use-auth';
 import { useNats } from '@/lib/hooks/use-nats';
 import { SUBJECTS } from '@/lib/subjects';
 import type { LogEntry } from './types';
 
-function buildQuickPickSubjects(): string[] {
-	return [SUBJECTS.echo(), SUBJECTS.pty.create(), SUBJECTS.pty.list(), SUBJECTS.notify.broadcast()];
+function buildQuickPickSubjects(orgId: string): string[] {
+	return [SUBJECTS.echo(orgId), SUBJECTS.pty.create(orgId), SUBJECTS.pty.list(orgId), SUBJECTS.notify.broadcast(orgId)];
 }
 
 interface PublishPanelProps {
@@ -19,7 +20,9 @@ interface PublishPanelProps {
 
 export function PublishPanel({ onPublish }: PublishPanelProps) {
 	const { connected, publish } = useNats();
-	const quickPicks = useMemo(() => buildQuickPickSubjects(), []);
+	const auth = useKhalAuth();
+	const orgId = auth?.orgId ?? 'default';
+	const quickPicks = useMemo(() => buildQuickPickSubjects(orgId), [orgId]);
 
 	const [subject, setSubject] = useState('');
 	const [payload, setPayload] = useState('');
@@ -58,7 +61,7 @@ export function PublishPanel({ onPublish }: PublishPanelProps) {
 			{/* Subject input */}
 			<Input
 				size="small"
-				placeholder={SUBJECTS.echo()}
+				placeholder={SUBJECTS.echo(orgId)}
 				value={subject}
 				onChange={(e) => {
 					setSubject(e.target.value);

@@ -114,7 +114,7 @@ export function MultiTerminalApp(props: { windowId: string; meta?: Record<string
 	const destroyPtySessions = useCallback((sessionIds: string[]) => {
 		const client = getNatsClient();
 		for (const sessionId of sessionIds) {
-			client.publish(SUBJECTS.pty.destroy(), { sessionId });
+			client.publish(SUBJECTS.pty.destroy(client.orgId), { sessionId });
 		}
 	}, []);
 
@@ -544,7 +544,7 @@ export function MultiTerminalApp(props: { windowId: string; meta?: Record<string
 				metaPublishedRef.current = true;
 				const client = getNatsClient();
 				if (client.userId) {
-					client.publish(SUBJECTS.desktop.event.metaUpdated(client.userId), {
+					client.publish(SUBJECTS.desktop.event.metaUpdated(client.orgId, client.userId), {
 						windowId: props.windowId,
 						meta: { tabs, activeTabId },
 					});
