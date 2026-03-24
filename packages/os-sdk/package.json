@@ -6,6 +6,7 @@
 	"exports": {
 		".": "./src/index.ts",
 		"./config": "./src/config.ts",
+		"./runtime": "./src/runtime/index.ts",
 		"./service": "./src/service/runtime.ts",
 		"./service/logger": "./src/service/logger.ts",
 		"./service/console-intercept": "./src/service/console-intercept.ts",
