@@ -13,6 +13,8 @@
  */
 
 // Base class (for custom runtimes)
+export { AWSRuntime } from './aws';
+export { AzureRuntime } from './azure';
 export { BaseRuntime } from './base';
 // Dependency helpers
 export { defaultBinDir, ensureBinary, getBunUrl, getNatsUrl, isBinaryCached } from './deps';
@@ -22,6 +24,7 @@ export { createRuntime, detectBestRuntime } from './factory';
 export { FirecrackerRuntime } from './firecracker';
 // Concrete implementations
 export { LocalRuntime } from './local';
+export { OCIRuntime } from './oci';
 export { RemoteRuntime } from './remote';
 // Types
 export type {

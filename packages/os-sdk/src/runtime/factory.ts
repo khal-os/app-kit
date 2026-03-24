@@ -29,6 +29,18 @@ export async function createRuntime(config: RuntimeConfig): Promise<Runtime> {
 			const { DockerRuntime } = await import('./docker');
 			return new DockerRuntime(config);
 		}
+		case 'aws': {
+			const { AWSRuntime } = await import('./aws');
+			return new AWSRuntime(config);
+		}
+		case 'azure': {
+			const { AzureRuntime } = await import('./azure');
+			return new AzureRuntime(config);
+		}
+		case 'oci': {
+			const { OCIRuntime } = await import('./oci');
+			return new OCIRuntime(config);
+		}
 		default: {
 			const exhaustive: never = config.type;
 			throw new Error(`Unknown runtime type: ${exhaustive}`);
@@ -47,7 +59,7 @@ export async function createRuntime(config: RuntimeConfig): Promise<Runtime> {
  */
 export function detectBestRuntime(): RuntimeType {
 	const explicit = process.env.KHAL_RUNTIME as RuntimeType | undefined;
-	if (explicit && ['local', 'remote', 'vercel', 'firecracker', 'docker'].includes(explicit)) {
+	if (explicit && ['local', 'remote', 'vercel', 'firecracker', 'docker', 'aws', 'azure', 'oci'].includes(explicit)) {
 		return explicit;
 	}
 
