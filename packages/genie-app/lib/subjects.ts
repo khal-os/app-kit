@@ -79,6 +79,20 @@ export const SUBJECTS = {
 		edit: () => `${PREFIX}.dir.edit`,
 	},
 
+	// --- Tasks domain ---
+	task: {
+		list: () => `${PREFIX}.task.list`,
+		show: () => `${PREFIX}.task.show`,
+		move: () => `${PREFIX}.task.move`,
+		create: () => `${PREFIX}.task.create`,
+		done: () => `${PREFIX}.task.done`,
+	},
+
+	// --- Projects domain ---
+	project: {
+		list: () => `${PREFIX}.project.list`,
+	},
+
 	// --- System health ---
 	system: {
 		doctor: () => `${PREFIX}.system.doctor`,

@@ -7,6 +7,7 @@ import { systemSubscriptions } from './system';
 import { teamsHandlers } from './teams';
 import { createTerminalProxy } from './terminal-proxy';
 import { TmuxControl } from './tmux-control';
+import { taskHandlers } from './tasks';
 import { wishHandlers } from './wishes';
 
 let tmux: TmuxControl;
@@ -213,6 +214,7 @@ createService({
 		...agentLifecycleHandlers,
 		...commsHandlers,
 		...wishHandlers,
+		...taskHandlers,
 		...directorySubscriptions,
 		...systemSubscriptions,
 	],
