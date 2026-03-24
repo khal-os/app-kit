@@ -1,5 +1,11 @@
+export type { AppStoreEntry, NewAppStoreEntry } from './app-store';
+export { approvalStatusEnum, appStore } from './app-store';
+export type { AppVersion, NewAppVersion } from './app-versions';
+export { appVersions } from './app-versions';
 export type { GoldenImage, NewGoldenImage } from './golden-images';
 export { goldenImageStatusEnum, goldenImages } from './golden-images';
+export type { InstalledApp, NewInstalledApp } from './installed-apps';
+export { installedAppStatusEnum, installedApps } from './installed-apps';
 export type { Instance, NewInstance } from './instances';
 export { instanceStatusEnum, instances } from './instances';
 export type { NewOsConfigEntry, OsConfigEntry } from './os-config';

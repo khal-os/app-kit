@@ -16,7 +16,8 @@
 		"./db/migrate": "./src/db/migrate.ts",
 		"./db/provision": "./src/db/provision.ts",
 		"./db/schema": "./src/db/schema/index.ts",
-		"./db/claim": "./src/db/claim.ts"
+		"./db/claim": "./src/db/claim.ts",
+		"./db/operators": "./src/db/operators.ts"
 	},
 	"peerDependencies": {
 		"@nats-io/jetstream": ">=3",

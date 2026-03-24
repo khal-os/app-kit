@@ -1,7 +1,7 @@
 import type { NatsConnection } from '@khal-os/sdk/service';
 import { createService } from '@khal-os/sdk/service';
 import { agentLifecycleHandlers } from './agent-lifecycle';
-import { appHandlers } from './apps';
+import { appsHandlers } from './apps';
 import { commsHandlers } from './comms';
 import { directorySubscriptions } from './directory';
 import { systemSubscriptions } from './system';
@@ -211,12 +211,12 @@ createService({
 		},
 
 		// --- Domain modules ---
+		...appsHandlers,
 		...teamsHandlers,
 		...agentLifecycleHandlers,
 		...commsHandlers,
 		...wishHandlers,
 		...taskHandlers,
-		...appHandlers,
 		...directorySubscriptions,
 		...systemSubscriptions,
 	],
