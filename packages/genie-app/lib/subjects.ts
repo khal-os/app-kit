@@ -93,6 +93,14 @@ export const SUBJECTS = {
 		list: () => `${PREFIX}.project.list`,
 	},
 
+	// --- Apps domain ---
+	apps: {
+		list: () => `${PREFIX}.apps.list`,
+		get: () => `${PREFIX}.apps.get`,
+		register: () => `${PREFIX}.apps.register`,
+		unregister: () => `${PREFIX}.apps.unregister`,
+	},
+
 	// --- System health ---
 	system: {
 		doctor: () => `${PREFIX}.system.doctor`,
