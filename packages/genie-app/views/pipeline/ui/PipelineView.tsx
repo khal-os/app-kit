@@ -1,20 +1,25 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { PIPELINE_COLUMNS, type PipelineItem, type Priority, type Stage } from '../types';
+import { usePipelineData } from '../hooks/usePipelineData';
+import { useFilteredItems, usePipelineFilters } from '../hooks/usePipelineFilters';
+import { PIPELINE_COLUMNS, type PipelineItem, type Stage } from '../types';
+import { CardDetailPanel } from './CardDetailPanel';
 import { KanbanBoard } from './KanbanBoard';
 import { PipelineToolbar } from './PipelineToolbar';
 
 interface PipelineViewProps {
-	items: PipelineItem[];
-	onCardClick?: (item: PipelineItem) => void;
-	onRefresh?: () => void;
+	windowId?: string;
+	meta?: Record<string, unknown>;
 }
 
-export function PipelineView({ items, onCardClick, onRefresh }: PipelineViewProps) {
-	const [searchQuery, setSearchQuery] = useState('');
-	const [priorityFilter, setPriorityFilter] = useState<Priority | null>(null);
-	const [assigneeFilter, setAssigneeFilter] = useState<string | null>(null);
+export function PipelineView(_props: PipelineViewProps) {
+	const { items, refreshData, moveItem } = usePipelineData();
+	const { searchQuery, priorityFilter, assigneeFilter, setSearchQuery, setPriorityFilter, setAssigneeFilter } =
+		usePipelineFilters();
+
+	const filteredItems = useFilteredItems(items);
+	const [selectedItem, setSelectedItem] = useState<PipelineItem | null>(null);
 
 	const assignees = useMemo(() => {
 		const names = new Set<string>();
@@ -24,40 +29,24 @@ export function PipelineView({ items, onCardClick, onRefresh }: PipelineViewProp
 		return Array.from(names).sort();
 	}, [items]);
 
-	const filteredItems = useMemo(() => {
-		let result = items;
+	const handleCardClick = useCallback((item: PipelineItem) => {
+		setSelectedItem(item);
+	}, []);
 
-		if (searchQuery) {
-			const q = searchQuery.toLowerCase();
-			result = result.filter(
-				(item) =>
-					item.title.toLowerCase().includes(q) ||
-					item.summary.toLowerCase().includes(q) ||
-					item.slug.toLowerCase().includes(q)
+	const handleCloseDetail = useCallback(() => {
+		setSelectedItem(null);
+	}, []);
+
+	const handleMove = useCallback(
+		(itemId: string, toStage: Stage) => {
+			moveItem(itemId, toStage);
+			// Update selected item if it's the one being moved
+			setSelectedItem((prev) =>
+				prev?.id === itemId ? { ...prev, stage: toStage, updatedAt: new Date().toISOString() } : prev
 			);
-		}
-
-		if (priorityFilter) {
-			result = result.filter((item) => item.priority === priorityFilter);
-		}
-
-		if (assigneeFilter) {
-			result = result.filter((item) => item.assignee === assigneeFilter);
-		}
-
-		return result;
-	}, [items, searchQuery, priorityFilter, assigneeFilter]);
-
-	const handleCardClick = useCallback(
-		(item: PipelineItem) => {
-			onCardClick?.(item);
 		},
-		[onCardClick]
+		[moveItem]
 	);
-
-	const handleRefresh = useCallback(() => {
-		onRefresh?.();
-	}, [onRefresh]);
 
 	// Per-stage counts for the status bar
 	const stageCounts = useMemo(() => {
@@ -72,7 +61,7 @@ export function PipelineView({ items, onCardClick, onRefresh }: PipelineViewProp
 	}, [filteredItems]);
 
 	return (
-		<div className="flex h-full flex-col" style={{ background: 'var(--khal-bg-secondary)' }}>
+		<div className="relative flex h-full flex-col" style={{ background: 'var(--khal-bg-secondary)' }}>
 			{/* Toolbar */}
 			<PipelineToolbar
 				searchQuery={searchQuery}
@@ -82,7 +71,7 @@ export function PipelineView({ items, onCardClick, onRefresh }: PipelineViewProp
 				assigneeFilter={assigneeFilter}
 				onAssigneeChange={setAssigneeFilter}
 				assignees={assignees}
-				onRefresh={handleRefresh}
+				onRefresh={refreshData}
 			/>
 
 			{/* Kanban board */}
@@ -105,6 +94,9 @@ export function PipelineView({ items, onCardClick, onRefresh }: PipelineViewProp
 					</span>
 				))}
 			</div>
+
+			{/* Detail panel */}
+			<CardDetailPanel item={selectedItem} onClose={handleCloseDetail} onMove={handleMove} />
 		</div>
 	);
 }

@@ -9,4 +9,5 @@ interface AppComponentProps {
 
 export const components: Record<string, ComponentType<AppComponentProps>> = {
 	genie: lazy(() => import('./views/genie/ui/GenieApp').then((m) => ({ default: m.GenieApp }))),
+	pipeline: lazy(() => import('./views/pipeline/ui/PipelineView').then((m) => ({ default: m.PipelineView }))),
 };
