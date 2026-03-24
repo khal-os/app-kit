@@ -44,7 +44,6 @@ interface WishEntry {
  *     ...
  *     Progress: 1/7 done | 5 in progress | 0 ready | 1 blocked
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: parser with many line-pattern branches
 function parseStatusOutput(text: string): { groups: WishGroup[]; summary: string } {
 	const lines = text.split('\n');
 	const groups: WishGroup[] = [];
