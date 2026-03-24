@@ -5,25 +5,25 @@ export type { AppComponentProps } from '@/components/apps/app-registry';
 
 // OS Primitives
 export * from '@/components/os-primitives';
+export * from '@/components/ui/avatar';
 // shadcn/ui components
 export * from '@/components/ui/badge';
 export * from '@/components/ui/button';
 export * from '@/components/ui/ContextMenu';
 export * from '@/components/ui/command';
 export * from '@/components/ui/dropdown-menu';
+// Design system components
+export * from '@/components/ui/glass-card';
 export * from '@/components/ui/input';
 export * from '@/components/ui/note';
+export * from '@/components/ui/progress-bar';
 export * from '@/components/ui/separator';
 export * from '@/components/ui/spinner';
+export * from '@/components/ui/status-dot';
 export * from '@/components/ui/switch';
 export * from '@/components/ui/theme-provider';
 export * from '@/components/ui/theme-switcher';
 export * from '@/components/ui/tooltip';
-// Design system components
-export * from '@/components/ui/glass-card';
-export * from '@/components/ui/status-dot';
-export * from '@/components/ui/progress-bar';
-export * from '@/components/ui/avatar';
 // Auth
 export { useKhalAuth, useKhalAuth as useOSAuth } from '@/lib/auth/use-auth';
 export { useNats, useNatsSubscription } from '@/lib/hooks/use-nats';
