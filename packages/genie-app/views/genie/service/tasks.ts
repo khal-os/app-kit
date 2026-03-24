@@ -214,9 +214,7 @@ export const taskHandlers = [
 					}
 				}
 
-				const projects = Array.from(projectMap.values()).sort((a, b) =>
-					a.name.localeCompare(b.name),
-				);
+				const projects = Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 				msg.respond(JSON.stringify({ projects }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err) }));

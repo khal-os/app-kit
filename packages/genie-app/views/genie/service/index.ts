@@ -4,10 +4,10 @@ import { agentLifecycleHandlers } from './agent-lifecycle';
 import { commsHandlers } from './comms';
 import { directorySubscriptions } from './directory';
 import { systemSubscriptions } from './system';
+import { taskHandlers } from './tasks';
 import { teamsHandlers } from './teams';
 import { createTerminalProxy } from './terminal-proxy';
 import { TmuxControl } from './tmux-control';
-import { taskHandlers } from './tasks';
 import { wishHandlers } from './wishes';
 
 let tmux: TmuxControl;
