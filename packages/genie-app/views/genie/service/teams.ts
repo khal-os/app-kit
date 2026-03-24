@@ -57,7 +57,7 @@ export const teamsHandlers: ServiceHandler[] = [
 		subject: SUBJECTS.teams.create(),
 		handler: async (msg) => {
 			try {
-				const req = msg.json<{ name: string; repo: string; branch?: string; wish?: string }>();
+				const req = msg.json<{ name: string; repo: string; branch?: string; wish?: string; session?: string }>();
 				if (!req.name || !req.repo) {
 					msg.respond(JSON.stringify({ ok: false, error: 'Missing required fields: name, repo' }));
 					return;
@@ -66,6 +66,7 @@ export const teamsHandlers: ServiceHandler[] = [
 				const args = ['team', 'create', req.name, '--repo', req.repo];
 				if (req.branch) args.push('--branch', req.branch);
 				if (req.wish) args.push('--wish', req.wish);
+				if (req.session) args.push('--session', req.session);
 
 				const result = await runGenieAsync(args, { json: false, timeout: 120_000 });
 				if (!result.ok) {

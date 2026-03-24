@@ -58,14 +58,14 @@ export const agentLifecycleHandlers: ServiceHandler[] = [
 		subject: SUBJECTS.agent.history(),
 		handler: (msg) => {
 			try {
-				const { name, full, since } = msg.json<{ name: string; full?: boolean; since?: string }>();
+				const { name, full, since } = msg.json<{ name: string; full?: boolean; since?: number }>();
 				if (!name) {
 					msg.respond(JSON.stringify({ error: 'Missing required field: name' }));
 					return;
 				}
 				const args = ['history', name, '--json'];
 				if (full) args.push('--full');
-				if (since) args.push('--since', since);
+				if (since !== undefined) args.push('--since', String(since));
 
 				const result = runGenie<unknown[]>(args, { timeout: 15_000 });
 				if (!result.ok) {
