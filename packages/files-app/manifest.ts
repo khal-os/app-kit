@@ -5,7 +5,7 @@ export default {
 			id: 'files',
 			label: 'Files',
 			permission: 'files',
-			minRole: 'viewer' as const,
+			minRole: 'member' as const,
 			natsPrefix: 'fs',
 			defaultSize: { width: 800, height: 600 },
 			component: './views/files/FilesApp',

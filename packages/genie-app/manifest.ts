@@ -5,7 +5,7 @@ export default {
 			id: 'genie',
 			label: 'Genie',
 			permission: 'genie',
-			minRole: 'developer' as const,
+			minRole: 'platform-dev' as const,
 			natsPrefix: 'genie',
 			defaultSize: { width: 960, height: 640 },
 			component: './views/genie/ui/GenieApp',

@@ -5,7 +5,7 @@ export default {
 			id: 'terminal',
 			label: 'Terminal',
 			permission: 'terminal',
-			minRole: 'developer' as const,
+			minRole: 'platform-dev' as const,
 			natsPrefix: 'pty',
 			defaultSize: { width: 720, height: 480 },
 			fullSizeContent: true,

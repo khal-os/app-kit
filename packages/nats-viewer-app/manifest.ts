@@ -5,7 +5,7 @@ export default {
 			id: 'nats-viewer',
 			label: 'NATS Viewer',
 			permission: 'nats-viewer',
-			minRole: 'admin' as const,
+			minRole: 'platform-dev' as const,
 			defaultSize: { width: 900, height: 600 },
 			component: './views/nats-viewer/NatsViewer',
 		},
