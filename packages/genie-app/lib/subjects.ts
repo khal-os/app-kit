@@ -99,6 +99,11 @@ export const SUBJECTS = {
 		get: () => `${PREFIX}.apps.get`,
 		register: () => `${PREFIX}.apps.register`,
 		unregister: () => `${PREFIX}.apps.unregister`,
+		store: {
+			list: () => `${PREFIX}.apps.store.list`,
+			submit: () => `${PREFIX}.apps.store.submit`,
+			approve: () => `${PREFIX}.apps.store.approve`,
+		},
 	},
 
 	// --- System health ---

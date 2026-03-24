@@ -1,119 +1,53 @@
 /**
- * Apps domain — NATS handlers for app registry CRUD.
+ * Apps domain — NATS handlers for app store & installation management.
  *
  * Endpoints:
- *   os.genie.apps.list       — list installed apps (JOIN app_store)
- *   os.genie.apps.get        — get app_store entry by slug
- *   os.genie.apps.register   — register app in app_store + installed_apps
- *   os.genie.apps.unregister — remove from installed_apps
+ *   os.genie.apps.list          — list installed apps with store metadata
+ *   os.genie.apps.get           — get single app by slug
+ *   os.genie.apps.register      — register app (upsert store + install)
+ *   os.genie.apps.unregister    — uninstall app (delete from installed_apps)
+ *   os.genie.apps.store.list    — list approved apps in the store
+ *   os.genie.apps.store.submit  — submit app for review
+ *   os.genie.apps.store.approve — approve a submitted app
  */
 
+import { getDatabaseUrl, getDb, initDb, isDbInitialized } from '@khal-os/sdk';
+import { eq } from '@khal-os/sdk/db/operators';
+import * as schema from '@khal-os/sdk/db/schema';
 import type { ServiceHandler } from '@khal-os/sdk/service';
 import { SUBJECTS } from '../../../lib/subjects';
 
-const { getDatabaseUrl } = require('@khal-os/sdk/config') as typeof import('@khal-os/sdk/config');
-
-// biome-ignore lint/suspicious/noExplicitAny: postgres is resolved at runtime from os-sdk
-let _sql: any = null;
-
-function sql() {
-	if (!_sql) {
-		// postgres is installed in @khal-os/sdk — resolved at runtime
-		_sql = require('postgres')(getDatabaseUrl(), { max: 5, idle_timeout: 20, connect_timeout: 10 });
+/** Ensure DB is initialized before first use. */
+function db() {
+	if (!isDbInitialized()) {
+		initDb({ schema, getDatabaseUrl });
 	}
-	return _sql;
+	return getDb();
 }
 
-/** Build the VALUES tuple for an app_store upsert from a register request. */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: flat data mapping, not control flow
-function storeDefaults(req: RegisterRequest) {
-	return {
-		slug: req.slug,
-		name: req.name,
-		icon_url: req.iconUrl ?? null,
-		icon_lucide: req.iconLucide ?? 'box',
-		short_description: req.shortDescription ?? null,
-		description: req.description ?? null,
-		screenshots: req.screenshots ?? [],
-		author_name: req.authorName,
-		author_url: req.authorUrl ?? null,
-		author_verified: req.authorVerified ?? false,
-		repo_url: req.repoUrl,
-		version: req.version ?? '0.0.1',
-		license: req.license ?? null,
-		category: req.category ?? 'Productivity',
-		tags: req.tags ?? [],
-		is_official: req.isOfficial ?? false,
-		is_experimental: req.isExperimental ?? false,
-		runtime_tier: req.runtimeTier ?? 'sdk',
-		min_role: req.minRole ?? 'member',
-		permission: req.permission ?? null,
-		nats_prefix: req.natsPrefix ?? null,
-		default_width: req.defaultWidth ?? 800,
-		default_height: req.defaultHeight ?? 600,
-		full_size_content: req.fullSizeContent ?? false,
-		permissions_required: req.permissionsRequired ?? [],
-		manifest_json: req.manifestJson ? JSON.stringify(req.manifestJson) : null,
-		approval_status: req.approvalStatus ?? 'pending',
-		current_version: req.version ?? '0.0.1',
-	};
-}
-
-interface RegisterRequest {
-	slug: string;
-	name: string;
-	path: string;
-	repoUrl: string;
-	authorName: string;
-	authorUrl?: string;
-	authorVerified?: boolean;
-	iconUrl?: string;
-	iconLucide?: string;
-	shortDescription?: string;
-	description?: string;
-	screenshots?: string[];
-	version?: string;
-	license?: string;
-	category?: string;
-	tags?: string[];
-	isOfficial?: boolean;
-	isExperimental?: boolean;
-	runtimeTier?: string;
-	minRole?: string;
-	permission?: string;
-	natsPrefix?: string;
-	defaultWidth?: number;
-	defaultHeight?: number;
-	fullSizeContent?: boolean;
-	permissionsRequired?: string[];
-	manifestJson?: Record<string, unknown>;
-	approvalStatus?: string;
-	installedBy?: string;
-}
-
-export const appHandlers: ServiceHandler[] = [
-	// --- List installed apps (with store metadata) ---
+export const appsHandlers: ServiceHandler[] = [
+	// --- List installed apps with store metadata ---
 	{
 		subject: SUBJECTS.apps.list(),
 		handler: async (msg) => {
 			try {
-				const rows = await sql()`
-					SELECT i.id AS installed_id, i.slug, i.path, i.status,
-						i.installed_at, i.installed_by, i.config,
-						s.*
-					FROM installed_apps i
-					LEFT JOIN app_store s ON i.app_id = s.id
-					WHERE i.status != 'uninstalled'
-					ORDER BY s.name ASC NULLS LAST
-				`;
-				msg.respond(JSON.stringify({ apps: rows }));
+				const rows = await db()
+					.select()
+					.from(schema.installedApps)
+					.leftJoin(schema.appStore, eq(schema.installedApps.appId, schema.appStore.id));
+
+				const apps = rows.map((r) => ({
+					...r.installed_apps,
+					store: r.app_store,
+				}));
+				msg.respond(JSON.stringify({ apps }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err), apps: [] }));
 			}
 		},
 	},
 
-	// --- Get app store entry by slug ---
+	// --- Get single app by slug ---
 	{
 		subject: SUBJECTS.apps.get(),
 		handler: async (msg) => {
@@ -123,16 +57,23 @@ export const appHandlers: ServiceHandler[] = [
 					msg.respond(JSON.stringify({ error: 'slug is required' }));
 					return;
 				}
-				const rows = await sql()`
-					SELECT * FROM app_store WHERE slug = ${req.slug}
-				`;
+
+				const rows = await db()
+					.select()
+					.from(schema.installedApps)
+					.leftJoin(schema.appStore, eq(schema.installedApps.appId, schema.appStore.id))
+					.where(eq(schema.installedApps.slug, req.slug))
+					.limit(1);
+
 				if (rows.length === 0) {
-					msg.respond(JSON.stringify({ error: 'App not found', app: null }));
+					msg.respond(JSON.stringify({ error: 'App not found' }));
 					return;
 				}
-				msg.respond(JSON.stringify({ app: rows[0] }));
+
+				const app = { ...rows[0].installed_apps, store: rows[0].app_store };
+				msg.respond(JSON.stringify({ app }));
 			} catch (err) {
-				msg.respond(JSON.stringify({ error: String(err), app: null }));
+				msg.respond(JSON.stringify({ error: String(err) }));
 			}
 		},
 	},
@@ -142,69 +83,110 @@ export const appHandlers: ServiceHandler[] = [
 		subject: SUBJECTS.apps.register(),
 		handler: async (msg) => {
 			try {
-				const req = msg.json<RegisterRequest>();
-				if (!req.slug || !req.name || !req.path || !req.repoUrl || !req.authorName) {
-					msg.respond(
-						JSON.stringify({ ok: false, error: 'Missing required fields: slug, name, path, repoUrl, authorName' })
-					);
+				const req = msg.json<{
+					slug: string;
+					name: string;
+					repoUrl: string;
+					path: string;
+					iconUrl?: string;
+					iconLucide?: string;
+					shortDescription?: string;
+					description?: string;
+					category?: string;
+					tags?: string[];
+					isOfficial?: boolean;
+					authorName?: string;
+					authorUrl?: string;
+					authorVerified?: boolean;
+					version?: string;
+					license?: string;
+					minRole?: string;
+					permission?: string;
+					natsPrefix?: string;
+					defaultWidth?: number;
+					defaultHeight?: number;
+					fullSizeContent?: boolean;
+					manifestJson?: unknown;
+					approvalStatus?: 'pending' | 'approved' | 'rejected';
+				}>();
+
+				if (!req.slug || !req.name || !req.repoUrl || !req.path) {
+					msg.respond(JSON.stringify({ ok: false, error: 'slug, name, repoUrl, and path are required' }));
 					return;
 				}
 
-				const db = sql();
-				const vals = storeDefaults(req);
+				// Upsert into app_store
+				const [storeEntry] = await db()
+					.insert(schema.appStore)
+					.values({
+						slug: req.slug,
+						name: req.name,
+						repoUrl: req.repoUrl,
+						iconUrl: req.iconUrl,
+						iconLucide: req.iconLucide,
+						shortDescription: req.shortDescription,
+						description: req.description,
+						category: req.category,
+						tags: req.tags,
+						isOfficial: req.isOfficial ?? false,
+						authorName: req.authorName,
+						authorUrl: req.authorUrl,
+						authorVerified: req.authorVerified ?? false,
+						version: req.version,
+						license: req.license,
+						minRole: req.minRole,
+						permission: req.permission,
+						natsPrefix: req.natsPrefix,
+						defaultWidth: req.defaultWidth,
+						defaultHeight: req.defaultHeight,
+						fullSizeContent: req.fullSizeContent ?? false,
+						manifestJson: req.manifestJson,
+						currentVersion: req.version,
+						approvalStatus: req.approvalStatus ?? 'pending',
+					})
+					.onConflictDoUpdate({
+						target: schema.appStore.slug,
+						set: {
+							name: req.name,
+							repoUrl: req.repoUrl,
+							iconUrl: req.iconUrl,
+							iconLucide: req.iconLucide,
+							shortDescription: req.shortDescription,
+							description: req.description,
+							version: req.version,
+							manifestJson: req.manifestJson,
+							updatedAt: new Date(),
+						},
+					})
+					.returning();
 
-				const storeRows = await db`
-					INSERT INTO app_store ${db(vals)}
-					ON CONFLICT (slug) DO UPDATE SET
-						${db(
-							vals,
-							'name',
-							'icon_url',
-							'icon_lucide',
-							'short_description',
-							'description',
-							'screenshots',
-							'author_name',
-							'author_url',
-							'author_verified',
-							'repo_url',
-							'version',
-							'license',
-							'category',
-							'tags',
-							'is_official',
-							'is_experimental',
-							'runtime_tier',
-							'min_role',
-							'permission',
-							'nats_prefix',
-							'default_width',
-							'default_height',
-							'full_size_content',
-							'permissions_required',
-							'manifest_json',
-							'current_version'
-						)},
-						updated_at = NOW()
-					RETURNING id
-				`;
+				// Upsert into installed_apps (slug is unique)
+				const [installed] = await db()
+					.insert(schema.installedApps)
+					.values({
+						appId: storeEntry.id,
+						slug: req.slug,
+						path: req.path,
+						status: 'installed',
+					})
+					.onConflictDoUpdate({
+						target: schema.installedApps.slug,
+						set: {
+							appId: storeEntry.id,
+							path: req.path,
+							status: 'installed',
+						},
+					})
+					.returning();
 
-				const appId = storeRows[0]?.id;
-
-				await db`
-					INSERT INTO installed_apps (app_id, slug, path, status, installed_by)
-					VALUES (${appId}, ${req.slug}, ${req.path}, 'installed', ${req.installedBy ?? null})
-					ON CONFLICT DO NOTHING
-				`;
-
-				msg.respond(JSON.stringify({ ok: true, appId }));
+				msg.respond(JSON.stringify({ ok: true, storeEntry, installed }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 			}
 		},
 	},
 
-	// --- Unregister app (remove from installed_apps, keep store entry) ---
+	// --- Unregister app (delete from installed_apps) ---
 	{
 		subject: SUBJECTS.apps.unregister(),
 		handler: async (msg) => {
@@ -215,11 +197,124 @@ export const appHandlers: ServiceHandler[] = [
 					return;
 				}
 
-				const result = await sql()`
-					DELETE FROM installed_apps WHERE slug = ${req.slug}
-				`;
+				const deleted = await db()
+					.delete(schema.installedApps)
+					.where(eq(schema.installedApps.slug, req.slug))
+					.returning();
 
-				msg.respond(JSON.stringify({ ok: true, deleted: result.count }));
+				msg.respond(JSON.stringify({ ok: true, removed: deleted.length }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Store: list approved apps ---
+	{
+		subject: SUBJECTS.apps.store.list(),
+		handler: async (msg) => {
+			try {
+				const rows = await db().select().from(schema.appStore).where(eq(schema.appStore.approvalStatus, 'approved'));
+
+				msg.respond(JSON.stringify({ apps: rows }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ error: String(err), apps: [] }));
+			}
+		},
+	},
+
+	// --- Store: submit app for review ---
+	{
+		subject: SUBJECTS.apps.store.submit(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{
+					slug: string;
+					name: string;
+					repoUrl: string;
+					shortDescription?: string;
+					description?: string;
+					authorName?: string;
+					authorUrl?: string;
+					category?: string;
+					tags?: string[];
+					manifestJson?: unknown;
+					submittedBy?: string;
+				}>();
+
+				if (!req.slug || !req.name || !req.repoUrl) {
+					msg.respond(JSON.stringify({ ok: false, error: 'slug, name, and repoUrl are required' }));
+					return;
+				}
+
+				const [entry] = await db()
+					.insert(schema.appStore)
+					.values({
+						slug: req.slug,
+						name: req.name,
+						repoUrl: req.repoUrl,
+						shortDescription: req.shortDescription,
+						description: req.description,
+						authorName: req.authorName,
+						authorUrl: req.authorUrl,
+						category: req.category,
+						tags: req.tags,
+						manifestJson: req.manifestJson,
+						approvalStatus: 'pending',
+						submittedBy: req.submittedBy,
+						submittedAt: new Date(),
+					})
+					.onConflictDoUpdate({
+						target: schema.appStore.slug,
+						set: {
+							name: req.name,
+							repoUrl: req.repoUrl,
+							shortDescription: req.shortDescription,
+							description: req.description,
+							manifestJson: req.manifestJson,
+							approvalStatus: 'pending',
+							submittedBy: req.submittedBy,
+							submittedAt: new Date(),
+							updatedAt: new Date(),
+						},
+					})
+					.returning();
+
+				msg.respond(JSON.stringify({ ok: true, entry }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Store: approve app ---
+	{
+		subject: SUBJECTS.apps.store.approve(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{ slug: string; approvedBy?: string }>();
+				if (!req.slug) {
+					msg.respond(JSON.stringify({ ok: false, error: 'slug is required' }));
+					return;
+				}
+
+				const [updated] = await db()
+					.update(schema.appStore)
+					.set({
+						approvalStatus: 'approved',
+						approvedBy: req.approvedBy,
+						approvedAt: new Date(),
+						updatedAt: new Date(),
+					})
+					.where(eq(schema.appStore.slug, req.slug))
+					.returning();
+
+				if (!updated) {
+					msg.respond(JSON.stringify({ ok: false, error: 'App not found' }));
+					return;
+				}
+
+				msg.respond(JSON.stringify({ ok: true, entry: updated }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 			}
