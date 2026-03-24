@@ -1,7 +1,7 @@
 /**
  * Runtime types — core abstractions for the pluggable runtime system.
  *
- * Every runtime (local, remote, Vercel, Firecracker, Docker) implements
+ * Every runtime (local, remote, Vercel, Firecracker, Docker, AWS, Azure, OCI) implements
  * the `Runtime` interface. Config and events are shared across all runtimes.
  */
 
@@ -9,7 +9,7 @@
 // Runtime type discriminator
 // ---------------------------------------------------------------------------
 
-export type RuntimeType = 'local' | 'remote' | 'vercel' | 'firecracker' | 'docker';
+export type RuntimeType = 'local' | 'remote' | 'vercel' | 'firecracker' | 'docker' | 'aws' | 'azure' | 'oci';
 
 // ---------------------------------------------------------------------------
 // Configuration
