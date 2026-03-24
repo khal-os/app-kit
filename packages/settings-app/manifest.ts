@@ -5,7 +5,7 @@ export default {
 			id: 'settings',
 			label: 'Settings',
 			permission: 'settings',
-			minRole: 'admin' as const,
+			minRole: 'platform-dev' as const,
 			defaultSize: { width: 800, height: 600 },
 			component: './views/settings/Settings',
 		},
