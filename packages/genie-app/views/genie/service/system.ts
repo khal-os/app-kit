@@ -22,6 +22,7 @@ interface DoctorResult {
  *   ! Session 'genie'...  → warn
  *   ✗ something           → fail
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: parser with many line-pattern branches
 function parseDoctorOutput(text: string): DoctorResult {
 	const result: DoctorResult = {
 		prerequisites: [],
