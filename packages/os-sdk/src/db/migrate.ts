@@ -18,7 +18,7 @@ export async function runMigrations(): Promise<void> {
 		return;
 	}
 
-	const searchPath = process.env.GENIE_OS_SEARCH_PATH;
+	const searchPath = process.env.KHAL_OS_SEARCH_PATH;
 	const opts: Record<string, unknown> = { max: 1 };
 	if (searchPath) {
 		opts.connection = { search_path: searchPath };

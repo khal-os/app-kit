@@ -4,7 +4,7 @@
  * Exports a ServiceHandler[] array to be spread into the main service subscriptions.
  */
 
-import type { ServiceHandler } from '@genie-os/sdk/service';
+import type { ServiceHandler } from '@khal-os/sdk/service';
 import { SUBJECTS } from '../../../lib/subjects';
 import { runGenie, runGenieAsync } from './cli';
 

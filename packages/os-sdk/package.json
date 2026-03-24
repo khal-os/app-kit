@@ -1,5 +1,5 @@
 {
-	"name": "@genie-os/sdk",
+	"name": "@khal-os/sdk",
 	"version": "0.0.1",
 	"private": true,
 	"main": "./src/index.ts",

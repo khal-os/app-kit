@@ -2,7 +2,7 @@
  * Service runtime helper — abstracts NATS connect + subscribe + graceful shutdown boilerplate.
  *
  * Usage:
- *   import { createService } from '@genie-os/sdk';
+ *   import { createService } from '@khal-os/sdk';
  *
  *   createService({
  *     name: 'my-service',

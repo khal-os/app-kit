@@ -1,8 +1,8 @@
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { NatsConnection } from '@genie-os/sdk/service';
-import { createService } from '@genie-os/sdk/service';
+import type { NatsConnection } from '@khal-os/sdk/service';
+import { createService } from '@khal-os/sdk/service';
 import { getFilesRoot, resolveSafePath, validateFilename } from '@/lib/files/safe-path';
 import type { FileWriteRequest, FsListRequest, FsWatchEvent } from '../schema';
 

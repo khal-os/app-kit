@@ -4,7 +4,7 @@
  * Exposes agent control operations beyond spawn (which lives in index.ts).
  */
 
-import type { ServiceHandler } from '@genie-os/sdk/service';
+import type { ServiceHandler } from '@khal-os/sdk/service';
 import { SUBJECTS } from '../../../lib/subjects';
 import { runGenie } from './cli';
 

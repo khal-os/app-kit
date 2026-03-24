@@ -45,7 +45,7 @@ export function getDatabaseUrl(): string {
 
 /**
  * Raw env var for the files root directory.
- * Use getFilesRoot() from @/lib/files/safe-path which applies the ~/genie-os-files default.
+ * Use getFilesRoot() from @/lib/files/safe-path which applies the ~/khal-os-files default.
  *
  * Server-only path config — safe to read (just a string), but the default requires node:os.
  */
