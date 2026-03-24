@@ -1,6 +1,5 @@
 'use client';
 
-import { useConcept } from '@/lib/theme/use-concept';
 import type { TerminalTab } from '../types';
 
 interface TerminalTabBarProps {
@@ -20,8 +19,6 @@ interface TerminalTabBarProps {
  * Only interactive elements (tabs, buttons) have data-no-drag.
  */
 export function TerminalTabBar({ tabs, activeTabId, onTabClick, onTabClose, onNewTab }: TerminalTabBarProps) {
-	const { controls } = useConcept();
-
 	const getTabTitle = (tab: TerminalTab) => {
 		if (tab.cwd) {
 			const parts = tab.cwd.split('/');
@@ -30,15 +27,13 @@ export function TerminalTabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
 		return tab.title || 'bash';
 	};
 
-	// Reserve space for the floating window controls on whichever side they are
-	const plControls = controls === 'traffic-light' ? '80px' : undefined;
-	const prControls = controls !== 'traffic-light' ? '100px' : undefined;
+	// Reserve space for the floating window controls (glass controls on the right)
+	const prControls = '100px';
 
 	return (
 		<div
 			className="terminal-tab-bar flex items-center gap-1 px-2 py-1.5"
 			style={{
-				paddingLeft: plControls,
 				paddingRight: prControls,
 				minHeight: '36px',
 			}}

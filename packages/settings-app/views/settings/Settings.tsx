@@ -16,7 +16,6 @@ import { SUBJECTS } from '@/lib/subjects';
 import { useKeybindStore } from '@/stores/keybind-store';
 import type { DesktopNotifMode } from '@/stores/notification-store';
 import { useNotificationStore } from '@/stores/notification-store';
-import type { ThemeConcept } from '@/stores/theme-store';
 import { useThemeStore } from '@/stores/theme-store';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
@@ -74,106 +73,6 @@ export function Settings(_props: { windowId: string; meta?: Record<string, unkno
 }
 
 // ---------------------------------------------------------------------------
-// Theme Concept Picker
-// ---------------------------------------------------------------------------
-
-const CONCEPT_OPTIONS: Array<{
-	id: ThemeConcept;
-	name: string;
-	description: string;
-	colors: string[];
-}> = [
-	{
-		id: 'genie',
-		name: 'Genie',
-		description: 'The default — blue accent, clean glass, dark mockup palette',
-		colors: ['#3b82f6', '#60a5fa', '#0a0a0f'],
-	},
-	{
-		id: 'glass-office',
-		name: 'Glass Office',
-		description: 'Heavy frosted glass, translucent surfaces, indigo glow',
-		colors: ['#4F46E5', '#818CF8', '#E0E7FF'],
-	},
-	{
-		id: 'slate',
-		name: 'Slate',
-		description: 'Zero glass, opaque surfaces, violet accent',
-		colors: ['#7C3AED', '#A78BFA', '#EDE9FE'],
-	},
-	{
-		id: 'prism',
-		name: 'Prism',
-		description: 'Dual accent: gold + teal, warm surfaces',
-		colors: ['#CA8A04', '#0D9488', '#FEF3C7'],
-	},
-	{
-		id: 'midnight',
-		name: 'Midnight',
-		description: 'Aurora glow, cyan + magenta neon',
-		colors: ['#06B6D4', '#8B5CF6', '#EC4899'],
-	},
-	{
-		id: 'terminal',
-		name: 'Terminal',
-		description: 'Retro green-on-black, razor-sharp',
-		colors: ['#00FF41', '#22C55E', '#0a0a0a'],
-	},
-	{
-		id: 'rose',
-		name: 'Ros\u00e9',
-		description: 'Soft blush, rose gold warmth',
-		colors: ['#E11D48', '#FB7185', '#FFF1F2'],
-	},
-	{
-		id: 'omni',
-		name: 'Omni',
-		description: 'Heavy glass, violet glow, dark-first',
-		colors: ['#9333EA', '#A855F7', '#E9D5FF'],
-	},
-];
-
-function ConceptPicker() {
-	const concept = useThemeStore((s) => s.concept);
-	const setConcept = useThemeStore((s) => s.setConcept);
-
-	return (
-		<div className="flex flex-col gap-3">
-			{CONCEPT_OPTIONS.map((opt) => (
-				<button
-					key={opt.id}
-					onClick={() => setConcept(opt.id)}
-					className={`flex items-center gap-4 rounded-lg border px-4 py-3 text-left transition-colors ${
-						concept === opt.id
-							? 'border-blue-400 bg-blue-100'
-							: 'border-gray-alpha-200 bg-background-100 hover:border-gray-alpha-300'
-					}`}
-				>
-					{/* Color swatch preview */}
-					<div className="flex h-8 w-12 shrink-0 overflow-hidden rounded-md">
-						{opt.colors.map((color) => (
-							<div key={color} className="flex-1" style={{ background: color }} />
-						))}
-					</div>
-
-					<div className="min-w-0 flex-1">
-						<p className="text-copy-13 font-medium text-gray-1000">{opt.name}</p>
-						<p className="text-copy-12 text-gray-800">{opt.description}</p>
-					</div>
-
-					{/* Selection indicator */}
-					<div
-						className={`h-3 w-3 shrink-0 rounded-full border-2 ${
-							concept === opt.id ? 'border-blue-600 bg-blue-600' : 'border-gray-alpha-400'
-						}`}
-					/>
-				</button>
-			))}
-		</div>
-	);
-}
-
-// ---------------------------------------------------------------------------
 // Appearance Tab
 // ---------------------------------------------------------------------------
 
@@ -197,13 +96,6 @@ function ReduceMotionToggle() {
 function AppearanceTab() {
 	return (
 		<div className="flex max-w-2xl flex-col gap-8 text-gray-1000">
-			<section>
-				<SectionHeader title="Theme Concept" description="Choose a visual style for the OS." />
-				<ConceptPicker />
-			</section>
-
-			<Separator />
-
 			<section>
 				<SectionHeader title="Mode" description="Choose light, dark, or system." />
 				<ThemeSwitcher />

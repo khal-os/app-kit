@@ -420,8 +420,8 @@ export function TerminalPane({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [paneId, subscribe, publish, request]);
 
-	// Update theme and DOM focus when focus or theme changes
-	const concept = useThemeStore((s) => s.concept);
+	// Update theme and DOM focus when focus changes
+	const mode = useThemeStore((s) => s.mode);
 	useEffect(() => {
 		const terminal = terminalRef.current;
 		if (!terminal) return;
@@ -437,7 +437,7 @@ export function TerminalPane({
 		} else {
 			terminal.blur();
 		}
-	}, [isFocused, concept]);
+	}, [isFocused, mode]);
 
 	// Trigger fit when pane is resized
 	useEffect(() => {
