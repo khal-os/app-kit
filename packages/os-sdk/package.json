@@ -14,7 +14,9 @@
 		"./service/trace": "./src/service/trace.ts",
 		"./db": "./src/db/factory.ts",
 		"./db/migrate": "./src/db/migrate.ts",
-		"./db/provision": "./src/db/provision.ts"
+		"./db/provision": "./src/db/provision.ts",
+		"./db/schema": "./src/db/schema/index.ts",
+		"./db/claim": "./src/db/claim.ts"
 	},
 	"peerDependencies": {
 		"@nats-io/jetstream": ">=3",
@@ -24,5 +26,8 @@
 		"drizzle-orm": ">=0.45",
 		"next": ">=16",
 		"postgres": ">=3"
+	},
+	"devDependencies": {
+		"drizzle-kit": "^0.31.10"
 	}
 }
