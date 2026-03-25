@@ -30,5 +30,10 @@
 	},
 	"devDependencies": {
 		"drizzle-kit": "^0.31.10"
+	},
+	"genieOs": {
+		"schema": {
+			"schemaName": "public"
+		}
 	}
 }
