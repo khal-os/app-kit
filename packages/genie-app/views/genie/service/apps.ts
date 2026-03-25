@@ -14,7 +14,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { getDatabaseUrl, getDb, initDb, isDbInitialized } from '@khal-os/sdk';
-import { eq } from '@khal-os/sdk/db/operators';
+import { and, avg, count, eq, inArray, sql } from '@khal-os/sdk/db/operators';
 import * as schema from '@khal-os/sdk/db/schema';
 import type { ServiceHandler } from '@khal-os/sdk/service';
 import { SUBJECTS } from '../../../lib/subjects';
@@ -25,6 +25,20 @@ function db() {
 		initDb({ schema, getDatabaseUrl });
 	}
 	return getDb();
+}
+
+/**
+ * Resolve an appId that might be a slug to the actual app_store UUID.
+ * If the value matches a slug in app_store, returns the row's id.
+ * Otherwise assumes it is already a UUID and returns as-is.
+ */
+async function resolveAppId(appIdOrSlug: string): Promise<string> {
+	const rows = await db()
+		.select({ id: schema.appStore.id })
+		.from(schema.appStore)
+		.where(eq(schema.appStore.slug, appIdOrSlug))
+		.limit(1);
+	return rows.length > 0 ? rows[0].id : appIdOrSlug;
 }
 
 /** Mission Control manifest — hardcoded since it has no package with manifest.ts. */
@@ -244,6 +258,10 @@ export const appsHandlers: ServiceHandler[] = [
 					fullSizeContent?: boolean;
 					manifestJson?: unknown;
 					approvalStatus?: 'pending' | 'approved' | 'rejected';
+					itemType?: string;
+					contents?: Array<{ slug: string; itemType: string; required: boolean }>;
+					agentConfig?: unknown;
+					ideaId?: string;
 				}>();
 
 				if (!req.slug || !req.name || !req.repoUrl || !req.path) {
@@ -279,6 +297,12 @@ export const appsHandlers: ServiceHandler[] = [
 						manifestJson: req.manifestJson,
 						currentVersion: req.version,
 						approvalStatus: req.approvalStatus ?? 'pending',
+						itemType:
+							(req.itemType as 'app' | 'workflow' | 'skill' | 'template' | 'stack' | 'agent' | 'board' | 'hook') ??
+							'app',
+						contents: req.contents,
+						agentConfig: req.agentConfig,
+						ideaId: req.ideaId,
 					})
 					.onConflictDoUpdate({
 						target: schema.appStore.slug,
@@ -291,6 +315,12 @@ export const appsHandlers: ServiceHandler[] = [
 							description: req.description,
 							version: req.version,
 							manifestJson: req.manifestJson,
+							itemType:
+								(req.itemType as 'app' | 'workflow' | 'skill' | 'template' | 'stack' | 'agent' | 'board' | 'hook') ??
+								'app',
+							contents: req.contents,
+							agentConfig: req.agentConfig,
+							ideaId: req.ideaId,
 							updatedAt: new Date(),
 						},
 					})
@@ -315,14 +345,57 @@ export const appsHandlers: ServiceHandler[] = [
 					})
 					.returning();
 
-				msg.respond(JSON.stringify({ ok: true, storeEntry, installed }));
+				// Stack-aware install: if this is a stack with contents, install all contained items transactionally
+				let stackItems = 0;
+				if (storeEntry.itemType === 'stack' && Array.isArray(req.contents) && req.contents.length > 0) {
+					await db().transaction(async (tx) => {
+						for (const item of req.contents!) {
+							// Look up the contained app in app_store by slug
+							const [found] = await tx
+								.select()
+								.from(schema.appStore)
+								.where(eq(schema.appStore.slug, item.slug))
+								.limit(1);
+
+							if (!found) {
+								if (item.required) {
+									throw new Error(`Required stack item not found in app_store: ${item.slug}`);
+								}
+								// Optional item not found — skip
+								continue;
+							}
+
+							// Upsert the contained item into installed_apps
+							await tx
+								.insert(schema.installedApps)
+								.values({
+									appId: found.id,
+									slug: found.slug,
+									path: req.path,
+									status: 'installed',
+								})
+								.onConflictDoUpdate({
+									target: schema.installedApps.slug,
+									set: {
+										appId: found.id,
+										path: req.path,
+										status: 'installed',
+									},
+								});
+
+							stackItems++;
+						}
+					});
+				}
+
+				msg.respond(JSON.stringify({ ok: true, storeEntry, installed, stackItems }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 			}
 		},
 	},
 
-	// --- Unregister app (delete from installed_apps) ---
+	// --- Unregister app (delete from installed_apps, stack-aware) ---
 	{
 		subject: SUBJECTS.apps.unregister(),
 		handler: async (msg) => {
@@ -333,12 +406,30 @@ export const appsHandlers: ServiceHandler[] = [
 					return;
 				}
 
+				// Check if this is a stack — if so, uninstall all contained items first
+				let stackItemsRemoved = 0;
+				const [storeRow] = await db()
+					.select({ itemType: schema.appStore.itemType, contents: schema.appStore.contents })
+					.from(schema.appStore)
+					.where(eq(schema.appStore.slug, req.slug))
+					.limit(1);
+
+				if (storeRow?.itemType === 'stack' && Array.isArray(storeRow.contents) && storeRow.contents.length > 0) {
+					const contentSlugs = (storeRow.contents as Array<{ slug: string }>).map((c) => c.slug);
+					const removedItems = await db()
+						.delete(schema.installedApps)
+						.where(inArray(schema.installedApps.slug, contentSlugs))
+						.returning();
+					stackItemsRemoved = removedItems.length;
+				}
+
+				// Delete the app/stack itself from installed_apps
 				const deleted = await db()
 					.delete(schema.installedApps)
 					.where(eq(schema.installedApps.slug, req.slug))
 					.returning();
 
-				msg.respond(JSON.stringify({ ok: true, removed: deleted.length }));
+				msg.respond(JSON.stringify({ ok: true, removed: deleted.length, stackItemsRemoved }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 			}
@@ -453,6 +544,228 @@ export const appsHandlers: ServiceHandler[] = [
 				msg.respond(JSON.stringify({ ok: true, entry: updated }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Run: start (insert into app_runs with status running) ---
+	{
+		subject: SUBJECTS.apps.run.start(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{
+					appId: string;
+					appVersion?: string;
+					userId?: string;
+					agentId?: string;
+					automationId?: string;
+					trigger?: string;
+					metadata?: unknown;
+				}>();
+
+				if (!req.appId) {
+					msg.respond(JSON.stringify({ ok: false, error: 'appId is required' }));
+					return;
+				}
+
+				const appId = await resolveAppId(req.appId);
+
+				const [run] = await db()
+					.insert(schema.appRuns)
+					.values({
+						appId,
+						appVersion: req.appVersion,
+						userId: req.userId,
+						agentId: req.agentId,
+						automationId: req.automationId,
+						trigger: (req.trigger as 'manual' | 'scheduled' | 'agent' | 'automation') ?? 'manual',
+						status: 'running',
+						metadata: req.metadata,
+					})
+					.returning();
+
+				msg.respond(JSON.stringify({ ok: true, runId: run.id }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Run: end (update app_runs with status, cost, trace, output) ---
+	{
+		subject: SUBJECTS.apps.run.end(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{
+					runId: string;
+					status: string;
+					costTokens?: number;
+					costComputeMs?: number;
+					costApiCalls?: number;
+					outputSummary?: string;
+					agentTrace?: unknown;
+					metadata?: unknown;
+				}>();
+
+				if (!req.runId || !req.status) {
+					msg.respond(JSON.stringify({ ok: false, error: 'runId and status are required' }));
+					return;
+				}
+
+				// Fetch the run to calculate duration
+				const existing = await db()
+					.select({ startedAt: schema.appRuns.startedAt })
+					.from(schema.appRuns)
+					.where(eq(schema.appRuns.id, req.runId))
+					.limit(1);
+
+				if (existing.length === 0) {
+					msg.respond(JSON.stringify({ ok: false, error: 'Run not found' }));
+					return;
+				}
+
+				const now = new Date();
+				const durationMs = now.getTime() - existing[0].startedAt.getTime();
+
+				await db()
+					.update(schema.appRuns)
+					.set({
+						status: req.status as 'running' | 'success' | 'failure' | 'error' | 'timeout',
+						endedAt: now,
+						durationMs,
+						costTokens: req.costTokens,
+						costComputeMs: req.costComputeMs,
+						costApiCalls: req.costApiCalls,
+						outputSummary: req.outputSummary,
+						agentTrace: req.agentTrace,
+						metadata: req.metadata,
+					})
+					.where(eq(schema.appRuns.id, req.runId));
+
+				msg.respond(JSON.stringify({ ok: true }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Run: list (paginated runs for an app) ---
+	{
+		subject: SUBJECTS.apps.run.list(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{ appId: string; limit?: number; offset?: number }>();
+
+				if (!req.appId) {
+					msg.respond(JSON.stringify({ error: 'appId is required', runs: [] }));
+					return;
+				}
+
+				const appId = await resolveAppId(req.appId);
+				const limit = req.limit ?? 50;
+				const offset = req.offset ?? 0;
+
+				const runs = await db()
+					.select()
+					.from(schema.appRuns)
+					.where(eq(schema.appRuns.appId, appId))
+					.orderBy(sql`${schema.appRuns.startedAt} desc`)
+					.limit(limit)
+					.offset(offset);
+
+				msg.respond(JSON.stringify({ runs }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ error: String(err), runs: [] }));
+			}
+		},
+	},
+
+	// --- Vote: insert into app_votes (idempotent) ---
+	{
+		subject: SUBJECTS.apps.vote(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{ userId: string; appId: string }>();
+
+				if (!req.userId || !req.appId) {
+					msg.respond(JSON.stringify({ ok: false, error: 'userId and appId are required' }));
+					return;
+				}
+
+				const appId = await resolveAppId(req.appId);
+
+				await db().insert(schema.appVotes).values({ userId: req.userId, appId }).onConflictDoNothing();
+
+				msg.respond(JSON.stringify({ ok: true }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Unvote: delete from app_votes ---
+	{
+		subject: SUBJECTS.apps.unvote(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{ userId: string; appId: string }>();
+
+				if (!req.userId || !req.appId) {
+					msg.respond(JSON.stringify({ ok: false, error: 'userId and appId are required' }));
+					return;
+				}
+
+				const appId = await resolveAppId(req.appId);
+
+				await db()
+					.delete(schema.appVotes)
+					.where(and(eq(schema.appVotes.userId, req.userId), eq(schema.appVotes.appId, appId)));
+
+				msg.respond(JSON.stringify({ ok: true }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Metrics: aggregated stats for an app ---
+	{
+		subject: SUBJECTS.apps.metrics(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{ appId: string }>();
+
+				if (!req.appId) {
+					msg.respond(JSON.stringify({ error: 'appId is required' }));
+					return;
+				}
+
+				const appId = await resolveAppId(req.appId);
+
+				// Aggregate run stats
+				const [runStats] = await db()
+					.select({
+						totalRuns: count(),
+						avgDurationMs: avg(schema.appRuns.durationMs),
+						successCount: count(sql`case when ${schema.appRuns.status} = 'success' then 1 end`),
+					})
+					.from(schema.appRuns)
+					.where(eq(schema.appRuns.appId, appId));
+
+				// Count votes
+				const [voteStats] = await db()
+					.select({ voteCount: count() })
+					.from(schema.appVotes)
+					.where(eq(schema.appVotes.appId, appId));
+
+				const totalRuns = runStats?.totalRuns ?? 0;
+				const avgDurationMs = runStats?.avgDurationMs ? Number(runStats.avgDurationMs) : null;
+				const successRate = totalRuns > 0 ? (runStats?.successCount ?? 0) / totalRuns : null;
+				const voteCount = voteStats?.voteCount ?? 0;
+
+				msg.respond(JSON.stringify({ totalRuns, avgDurationMs, successRate, voteCount }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ error: String(err) }));
 			}
 		},
 	},

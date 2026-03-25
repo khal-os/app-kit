@@ -113,6 +113,14 @@ export const SUBJECTS = {
 			submit: () => `${PREFIX}.apps.store.submit`,
 			approve: () => `${PREFIX}.apps.store.approve`,
 		},
+		run: {
+			start: () => `${PREFIX}.apps.run.start`,
+			end: () => `${PREFIX}.apps.run.end`,
+			list: () => `${PREFIX}.apps.run.list`,
+		},
+		vote: () => `${PREFIX}.apps.vote`,
+		unvote: () => `${PREFIX}.apps.unvote`,
+		metrics: () => `${PREFIX}.apps.metrics`,
 	},
 
 	// --- System health ---
