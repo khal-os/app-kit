@@ -79,6 +79,42 @@ export const SUBJECTS = {
 		edit: () => `${PREFIX}.dir.edit`,
 	},
 
+	// --- Ideas domain (thin layer over tasks) ---
+	ideas: {
+		add: () => `${PREFIX}.ideas.add`,
+		list: () => `${PREFIX}.ideas.list`,
+		vote: () => `${PREFIX}.ideas.vote`,
+		promote: () => `${PREFIX}.ideas.promote`,
+		archive: () => `${PREFIX}.ideas.archive`,
+	},
+
+	// --- Tasks domain ---
+	task: {
+		list: () => `${PREFIX}.task.list`,
+		show: () => `${PREFIX}.task.show`,
+		move: () => `${PREFIX}.task.move`,
+		create: () => `${PREFIX}.task.create`,
+		done: () => `${PREFIX}.task.done`,
+	},
+
+	// --- Projects domain ---
+	project: {
+		list: () => `${PREFIX}.project.list`,
+	},
+
+	// --- Apps domain ---
+	apps: {
+		list: () => `${PREFIX}.apps.list`,
+		get: () => `${PREFIX}.apps.get`,
+		register: () => `${PREFIX}.apps.register`,
+		unregister: () => `${PREFIX}.apps.unregister`,
+		store: {
+			list: () => `${PREFIX}.apps.store.list`,
+			submit: () => `${PREFIX}.apps.store.submit`,
+			approve: () => `${PREFIX}.apps.store.approve`,
+		},
+	},
+
 	// --- System health ---
 	system: {
 		doctor: () => `${PREFIX}.system.doctor`,

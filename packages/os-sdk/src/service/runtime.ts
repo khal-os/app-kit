@@ -2,7 +2,7 @@
  * Service runtime helper — abstracts NATS connect + subscribe + graceful shutdown boilerplate.
  *
  * Usage:
- *   import { createService } from '@genie-os/sdk';
+ *   import { createService } from '@khal-os/sdk';
  *
  *   createService({
  *     name: 'my-service',
@@ -23,7 +23,7 @@ import { createLogger } from './logger';
 import { extractTrace, newSpan } from './trace';
 
 // Re-export types so callers don't need to import from @nats-io directly.
-export type { NatsConnection, Msg };
+export type { Msg, NatsConnection };
 
 /**
  * A single NATS subject subscription with its message handler.

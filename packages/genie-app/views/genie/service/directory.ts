@@ -14,7 +14,9 @@ interface DirAddPayload {
 	dir?: string;
 	repo?: string;
 	model?: string;
+	promptMode?: string;
 	roles?: string[];
+	global?: boolean;
 }
 
 interface DirRemovePayload {
@@ -26,8 +28,9 @@ interface DirEditPayload {
 	model?: string;
 	dir?: string;
 	repo?: string;
+	promptMode?: string;
 	roles?: string[];
-	description?: string;
+	global?: boolean;
 }
 
 export const directorySubscriptions = [
@@ -80,7 +83,7 @@ export const directorySubscriptions = [
 		subject: SUBJECTS.dir.add(),
 		handler: (msg: { data: Uint8Array; json: <T>() => T; respond: (data: string) => void }) => {
 			try {
-				const { name, dir, repo, model, roles } = msg.json<DirAddPayload>();
+				const { name, dir, repo, model, promptMode, roles, global: isGlobal } = msg.json<DirAddPayload>();
 				if (!name) {
 					msg.respond(JSON.stringify({ error: 'name is required' }));
 					return;
@@ -90,11 +93,9 @@ export const directorySubscriptions = [
 				if (dir) args.push('--dir', dir);
 				if (repo) args.push('--repo', repo);
 				if (model) args.push('--model', model);
-				if (roles) {
-					for (const role of roles) {
-						args.push('--role', role);
-					}
-				}
+				if (promptMode) args.push('--prompt-mode', promptMode);
+				if (roles?.length) args.push('--roles', ...roles);
+				if (isGlobal) args.push('--global');
 
 				const result = runGenie(args, { json: false });
 				if (!result.ok) {
@@ -136,7 +137,7 @@ export const directorySubscriptions = [
 		subject: SUBJECTS.dir.edit(),
 		handler: (msg: { data: Uint8Array; json: <T>() => T; respond: (data: string) => void }) => {
 			try {
-				const { name, model, dir, repo, roles, description } = msg.json<DirEditPayload>();
+				const { name, model, dir, repo, promptMode, roles, global: isGlobal } = msg.json<DirEditPayload>();
 				if (!name) {
 					msg.respond(JSON.stringify({ error: 'name is required' }));
 					return;
@@ -146,12 +147,9 @@ export const directorySubscriptions = [
 				if (model) args.push('--model', model);
 				if (dir) args.push('--dir', dir);
 				if (repo) args.push('--repo', repo);
-				if (description) args.push('--description', description);
-				if (roles) {
-					for (const role of roles) {
-						args.push('--role', role);
-					}
-				}
+				if (promptMode) args.push('--prompt-mode', promptMode);
+				if (roles?.length) args.push('--roles', ...roles);
+				if (isGlobal) args.push('--global');
 
 				const result = runGenie(args, { json: false });
 				if (!result.ok) {

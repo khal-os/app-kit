@@ -1,11 +1,12 @@
 {
-	"name": "@genie-os/sdk",
+	"name": "@khal-os/sdk",
 	"version": "0.0.1",
 	"private": true,
 	"main": "./src/index.ts",
 	"exports": {
 		".": "./src/index.ts",
 		"./config": "./src/config.ts",
+		"./runtime": "./src/runtime/index.ts",
 		"./service": "./src/service/runtime.ts",
 		"./service/logger": "./src/service/logger.ts",
 		"./service/console-intercept": "./src/service/console-intercept.ts",
@@ -13,7 +14,10 @@
 		"./service/trace": "./src/service/trace.ts",
 		"./db": "./src/db/factory.ts",
 		"./db/migrate": "./src/db/migrate.ts",
-		"./db/provision": "./src/db/provision.ts"
+		"./db/provision": "./src/db/provision.ts",
+		"./db/schema": "./src/db/schema/index.ts",
+		"./db/claim": "./src/db/claim.ts",
+		"./db/operators": "./src/db/operators.ts"
 	},
 	"peerDependencies": {
 		"@nats-io/jetstream": ">=3",
@@ -23,5 +27,13 @@
 		"drizzle-orm": ">=0.45",
 		"next": ">=16",
 		"postgres": ">=3"
+	},
+	"genieOs": {
+		"schema": {
+			"schemaName": "public"
+		}
+	},
+	"devDependencies": {
+		"drizzle-kit": "^0.31.10"
 	}
 }

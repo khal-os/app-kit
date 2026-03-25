@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { drizzle } from 'drizzle-orm/postgres-js';
@@ -6,6 +7,75 @@ import postgres from 'postgres';
 import { getDatabaseUrl } from '../config';
 
 const HOST_MIGRATIONS_FOLDER = './drizzle';
+
+/**
+ * Bootstrap the Drizzle migration journal when tables already exist but the
+ * journal doesn't. This handles installs where tables were created by raw SQL
+ * before Drizzle was set up — without this, the migrator tries to re-run all
+ * migrations and crashes on CREATE TYPE/TABLE that already exist.
+ */
+async function bootstrapJournalIfNeeded(client: postgres.Sql, migrationsFolder: string): Promise<void> {
+	const journalPath = resolve(migrationsFolder, 'meta', '_journal.json');
+	if (!existsSync(journalPath)) return;
+
+	// Drizzle stores its journal in the "drizzle" schema, not "public"
+	const DRIZZLE_SCHEMA = 'drizzle';
+	const DRIZZLE_TABLE = '__drizzle_migrations';
+
+	// If journal table already exists, Drizzle will handle state correctly
+	const [{ exists: journalTableExists }] = await client`
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.tables
+			WHERE table_schema = ${DRIZZLE_SCHEMA} AND table_name = ${DRIZZLE_TABLE}
+		) as exists
+	`;
+	if (journalTableExists) return;
+
+	// Journal table doesn't exist — check if any migrations were already applied
+	// by looking for tables they create
+	const journal = JSON.parse(readFileSync(journalPath, 'utf8'));
+	const alreadyApplied: Array<{ hash: string; when: number; tag: string }> = [];
+
+	for (const entry of journal.entries) {
+		const sqlPath = resolve(migrationsFolder, `${entry.tag}.sql`);
+		if (!existsSync(sqlPath)) continue;
+
+		const sqlContent = readFileSync(sqlPath, 'utf8');
+		// Find the first CREATE TABLE in this migration to check if it was applied
+		const match = sqlContent.match(/CREATE TABLE "(\w+)"/);
+		if (!match) continue;
+
+		const [{ exists: tableExists }] = await client`
+			SELECT EXISTS (
+				SELECT 1 FROM information_schema.tables
+				WHERE table_schema = 'public' AND table_name = ${match[1]}
+			) as exists
+		`;
+
+		if (tableExists) {
+			const hash = createHash('sha256').update(sqlContent).digest('hex');
+			alreadyApplied.push({ hash, when: entry.when, tag: entry.tag });
+		}
+	}
+
+	if (alreadyApplied.length > 0) {
+		await client.unsafe('CREATE SCHEMA IF NOT EXISTS "drizzle"');
+		await client.unsafe(`
+			CREATE TABLE IF NOT EXISTS "drizzle"."__drizzle_migrations" (
+				id SERIAL PRIMARY KEY,
+				hash text NOT NULL,
+				created_at bigint
+			)
+		`);
+		for (const m of alreadyApplied) {
+			await client`INSERT INTO "drizzle"."__drizzle_migrations" (hash, created_at) VALUES (${m.hash}, ${m.when})`;
+		}
+		// biome-ignore lint/suspicious/noConsole: migration logging
+		console.log(
+			`[db:migrate] bootstrapped journal with ${alreadyApplied.length} pre-existing migration(s): ${alreadyApplied.map((m) => m.tag).join(', ')}`
+		);
+	}
+}
 
 /**
  * Run host-only migrations from ./drizzle (backwards-compatible).
@@ -18,7 +88,7 @@ export async function runMigrations(): Promise<void> {
 		return;
 	}
 
-	const searchPath = process.env.GENIE_OS_SEARCH_PATH;
+	const searchPath = process.env.KHAL_OS_SEARCH_PATH;
 	const opts: Record<string, unknown> = { max: 1 };
 	if (searchPath) {
 		opts.connection = { search_path: searchPath };
@@ -27,6 +97,7 @@ export async function runMigrations(): Promise<void> {
 	const db = drizzle(migrationClient);
 
 	try {
+		await bootstrapJournalIfNeeded(migrationClient, HOST_MIGRATIONS_FOLDER);
 		await migrate(db, { migrationsFolder: HOST_MIGRATIONS_FOLDER });
 	} finally {
 		await migrationClient.end();
@@ -104,6 +175,7 @@ async function runAppMigrations(target: AppMigrationTarget): Promise<void> {
 	try {
 		// biome-ignore lint/suspicious/noConsole: migration logging
 		console.log(`[db:migrate] running migrations for ${target.packageName} (schema: ${target.schemaName})`);
+		await bootstrapJournalIfNeeded(migrationClient, target.migrationsFolder);
 		await migrate(db, { migrationsFolder: target.migrationsFolder });
 		// biome-ignore lint/suspicious/noConsole: migration logging
 		console.log(`[db:migrate] migrations complete for ${target.packageName}`);

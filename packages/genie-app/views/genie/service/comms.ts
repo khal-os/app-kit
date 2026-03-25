@@ -9,7 +9,7 @@
  *   os.genie.comms.chat.read  — read team chat history
  */
 
-import type { ServiceHandler } from '@genie-os/sdk/service';
+import type { ServiceHandler } from '@khal-os/sdk/service';
 import { SUBJECTS } from '../../../lib/subjects';
 import { runGenie } from './cli';
 
@@ -45,14 +45,14 @@ export const commsHandlers: ServiceHandler[] = [
 		subject: SUBJECTS.comms.broadcast(),
 		handler: (msg) => {
 			try {
-				const req = msg.json<{ body: string; team?: string }>();
+				const req = msg.json<{ body: string; from?: string }>();
 				if (!req.body) {
 					msg.respond(JSON.stringify({ error: 'Missing required field: body' }));
 					return;
 				}
 
 				const args = ['broadcast', req.body];
-				if (req.team) args.push('--team', req.team);
+				if (req.from) args.push('--from', req.from);
 
 				const result = runGenie(args, { json: false });
 				if (!result.ok) {

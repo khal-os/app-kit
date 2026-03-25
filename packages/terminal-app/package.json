@@ -1,5 +1,5 @@
 {
-	"name": "@genie-os/terminal-app",
+	"name": "@khal-os/terminal-app",
 	"version": "0.0.1",
 	"private": true,
 	"main": "./manifest.ts",

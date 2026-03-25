@@ -29,10 +29,16 @@ export function useNatsRequest<T = unknown>(
 	const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const mountedRef = useRef(true);
 
+	// Stabilize payload by serializing — prevents infinite re-render loops
+	// when callers pass inline objects like { name: teamName }
+	const payloadKey = JSON.stringify(payload ?? null);
+	const payloadRef = useRef(payload);
+	payloadRef.current = payload;
+
 	const fetchData = useCallback(async () => {
 		try {
 			const client = getNatsClient();
-			const response = await client.request(subject, payload ?? {}, 5000);
+			const response = await client.request(subject, payloadRef.current ?? {}, 5000);
 			if (!mountedRef.current) return;
 			setData(response as T);
 			setError(null);
@@ -44,7 +50,7 @@ export function useNatsRequest<T = unknown>(
 				setLoading(false);
 			}
 		}
-	}, [subject, payload]);
+	}, [subject, payloadKey]);
 
 	useEffect(() => {
 		mountedRef.current = true;
