@@ -5,6 +5,7 @@ import { appsHandlers, seedCoreApps } from './apps';
 import { runGenieAsync } from './cli';
 import { commsHandlers } from './comms';
 import { directorySubscriptions } from './directory';
+import { ideasHandlers } from './ideas';
 import { systemSubscriptions } from './system';
 import { taskHandlers } from './tasks';
 import { teamsHandlers } from './teams';
@@ -254,6 +255,7 @@ createService({
 		...commsHandlers,
 		...wishHandlers,
 		...taskHandlers,
+		...ideasHandlers,
 		...directorySubscriptions,
 		...systemSubscriptions,
 	],
