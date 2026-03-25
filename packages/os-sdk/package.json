@@ -28,12 +28,12 @@
 		"next": ">=16",
 		"postgres": ">=3"
 	},
-	"devDependencies": {
-		"drizzle-kit": "^0.31.10"
-	},
 	"genieOs": {
 		"schema": {
 			"schemaName": "public"
 		}
+	},
+	"devDependencies": {
+		"drizzle-kit": "^0.31.10"
 	}
 }
