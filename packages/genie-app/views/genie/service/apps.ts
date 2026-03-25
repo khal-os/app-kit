@@ -11,6 +11,8 @@
  *   os.genie.apps.store.approve — approve a submitted app
  */
 
+import { existsSync, readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { getDatabaseUrl, getDb, initDb, isDbInitialized } from '@khal-os/sdk';
 import { eq } from '@khal-os/sdk/db/operators';
 import * as schema from '@khal-os/sdk/db/schema';
@@ -23,6 +25,140 @@ function db() {
 		initDb({ schema, getDatabaseUrl });
 	}
 	return getDb();
+}
+
+/** Mission Control manifest — hardcoded since it has no package with manifest.ts. */
+const MISSION_CONTROL_MANIFEST = {
+	id: 'mission-control',
+	views: [
+		{
+			id: 'mission-control',
+			label: 'Mission Control',
+			permission: 'mission-control',
+			minRole: 'member',
+			natsPrefix: 'task',
+			defaultSize: { width: 1200, height: 800 },
+		},
+	],
+	desktop: {
+		icon: '/icons/dusk/mission_control.svg',
+		categories: ['System'],
+		comment: 'See all your tasks flow through stages',
+	},
+};
+
+interface ManifestView {
+	id: string;
+	label: string;
+	permission?: string;
+	minRole?: string;
+	natsPrefix?: string;
+	defaultSize?: { width: number; height: number };
+	fullSizeContent?: boolean;
+	component?: string;
+}
+
+interface PackageManifest {
+	id: string;
+	views: ManifestView[];
+	desktop?: {
+		icon?: string;
+		categories?: string[];
+		comment?: string;
+	};
+}
+
+/**
+ * Seed core apps from package manifests into app_store + installed_apps.
+ * Idempotent — uses ON CONFLICT DO UPDATE so restarts don't create duplicates.
+ */
+export async function seedCoreApps(): Promise<void> {
+	const packagesDir = resolve(process.cwd(), 'packages');
+	const manifests: { manifest: PackageManifest; pkgDir: string }[] = [];
+
+	// Discover package manifests
+	if (existsSync(packagesDir)) {
+		const entries = readdirSync(packagesDir, { withFileTypes: true });
+		for (const entry of entries) {
+			if (!entry.isDirectory()) continue;
+			const manifestPath = resolve(packagesDir, entry.name, 'manifest.ts');
+			if (!existsSync(manifestPath)) continue;
+
+			try {
+				const mod = await import(manifestPath);
+				manifests.push({
+					manifest: mod.default as PackageManifest,
+					pkgDir: resolve(packagesDir, entry.name),
+				});
+			} catch (err) {
+				console.warn(`[apps-service] failed to import manifest from ${entry.name}:`, err);
+			}
+		}
+	}
+
+	// Add mission-control (no package, hardcoded manifest)
+	manifests.push({
+		manifest: MISSION_CONTROL_MANIFEST,
+		pkgDir: resolve(packagesDir, 'mission-control'),
+	});
+
+	// Upsert each manifest's primary view into app_store + installed_apps
+	for (const { manifest, pkgDir } of manifests) {
+		const view = manifest.views[0];
+		if (!view) continue;
+
+		try {
+			const [storeEntry] = await db()
+				.insert(schema.appStore)
+				.values({
+					slug: view.id,
+					name: view.label,
+					repoUrl: `local://packages/${manifest.id}`,
+					iconLucide: manifest.desktop?.icon,
+					shortDescription: manifest.desktop?.comment,
+					category: manifest.desktop?.categories?.[0],
+					isOfficial: true,
+					approvalStatus: 'approved',
+					permission: view.permission,
+					natsPrefix: view.natsPrefix,
+					defaultWidth: view.defaultSize?.width,
+					defaultHeight: view.defaultSize?.height,
+					fullSizeContent: view.fullSizeContent ?? false,
+					minRole: view.minRole,
+					manifestJson: manifest,
+				})
+				.onConflictDoUpdate({
+					target: schema.appStore.slug,
+					set: {
+						name: view.label,
+						manifestJson: manifest,
+						updatedAt: new Date(),
+					},
+				})
+				.returning();
+
+			await db()
+				.insert(schema.installedApps)
+				.values({
+					appId: storeEntry.id,
+					slug: view.id,
+					path: pkgDir,
+					status: 'installed',
+				})
+				.onConflictDoUpdate({
+					target: schema.installedApps.slug,
+					set: {
+						appId: storeEntry.id,
+						path: pkgDir,
+						status: 'installed',
+					},
+				});
+
+			console.log(`[apps-service] seeded core app: ${view.id}`);
+		} catch (err) {
+			console.warn(`[apps-service] failed to seed ${view.id}:`, err);
+		}
+	}
 }
 
 export const appsHandlers: ServiceHandler[] = [
