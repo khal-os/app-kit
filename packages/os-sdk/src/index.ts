@@ -18,7 +18,21 @@ export {
 	isDbInitialized,
 } from './db/factory';
 export { runAllMigrations, runMigrations } from './db/migrate';
+// NATS instance isolation
+export {
+	extractInstanceId,
+	INSTANCE_SUBJECT_PREFIX,
+	instanceAuthConfig,
+	instanceSubject,
+	instanceWildcard,
+	isInstanceScoped,
+	stripInstancePrefix,
+	validateInstanceAccess,
+} from './lib/nats-isolation';
 export { interceptConsole, restoreConsole } from './service/console-intercept';
+// Fleet service
+export type { CreateInstanceConfig, FleetService } from './service/fleet';
+export { fleet } from './service/fleet';
 export type { LogEntry, Logger } from './service/logger';
 export { createLogger } from './service/logger';
 export {

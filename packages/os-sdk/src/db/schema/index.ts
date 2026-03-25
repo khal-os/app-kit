@@ -6,6 +6,8 @@ export type { AppVersion, NewAppVersion } from './app-versions';
 export { appVersions } from './app-versions';
 export type { AppVote, NewAppVote } from './app-votes';
 export { appVotes } from './app-votes';
+export type { AuditEvent, NewAuditEvent } from './audit-events';
+export { auditEvents } from './audit-events';
 export type { GoldenImage, NewGoldenImage } from './golden-images';
 export { goldenImageStatusEnum, goldenImages } from './golden-images';
 export type { InstalledApp, NewInstalledApp } from './installed-apps';
