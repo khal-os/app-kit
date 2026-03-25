@@ -79,6 +79,15 @@ export const SUBJECTS = {
 		edit: () => `${PREFIX}.dir.edit`,
 	},
 
+	// --- Ideas domain (thin layer over tasks) ---
+	ideas: {
+		add: () => `${PREFIX}.ideas.add`,
+		list: () => `${PREFIX}.ideas.list`,
+		vote: () => `${PREFIX}.ideas.vote`,
+		promote: () => `${PREFIX}.ideas.promote`,
+		archive: () => `${PREFIX}.ideas.archive`,
+	},
+
 	// --- Tasks domain ---
 	task: {
 		list: () => `${PREFIX}.task.list`,
