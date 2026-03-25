@@ -22,6 +22,13 @@
 			"when": 1774479917498,
 			"tag": "0002_remarkable_doctor_doom",
 			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "7",
+			"when": 1774482582123,
+			"tag": "0003_odd_tarot",
+			"breakpoints": true
 		}
 	]
 }
