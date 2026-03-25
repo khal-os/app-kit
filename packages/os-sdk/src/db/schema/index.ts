@@ -1,7 +1,11 @@
+export type { AppRun, NewAppRun } from './app-runs';
+export { appRuns, runStatusEnum, runTriggerEnum } from './app-runs';
 export type { AppStoreEntry, NewAppStoreEntry } from './app-store';
-export { approvalStatusEnum, appStore } from './app-store';
+export { approvalStatusEnum, appStore, itemTypeEnum } from './app-store';
 export type { AppVersion, NewAppVersion } from './app-versions';
 export { appVersions } from './app-versions';
+export type { AppVote, NewAppVote } from './app-votes';
+export { appVotes } from './app-votes';
 export type { GoldenImage, NewGoldenImage } from './golden-images';
 export { goldenImageStatusEnum, goldenImages } from './golden-images';
 export type { InstalledApp, NewInstalledApp } from './installed-apps';

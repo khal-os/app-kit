@@ -2,12 +2,24 @@ import { boolean, integer, jsonb, pgEnum, pgTable, text, timestamp } from 'drizz
 
 export const approvalStatusEnum = pgEnum('approval_status', ['pending', 'approved', 'rejected']);
 
+export const itemTypeEnum = pgEnum('item_type', [
+	'app',
+	'workflow',
+	'skill',
+	'template',
+	'stack',
+	'agent',
+	'board',
+	'hook',
+]);
+
 export const appStore = pgTable('app_store', {
 	id: text('id')
 		.primaryKey()
 		.$defaultFn(() => crypto.randomUUID()),
 	slug: text('slug').unique().notNull(),
 	name: text('name').notNull(),
+	itemType: itemTypeEnum('item_type').notNull().default('app'),
 	iconUrl: text('icon_url'),
 	iconLucide: text('icon_lucide'),
 	shortDescription: text('short_description'),
@@ -40,6 +52,9 @@ export const appStore = pgTable('app_store', {
 	defaultHeight: integer('default_height'),
 	fullSizeContent: boolean('full_size_content').default(false),
 	permissionsRequired: text('permissions_required').array(),
+	contents: jsonb('contents'),
+	agentConfig: jsonb('agent_config'),
+	ideaId: text('idea_id'),
 	manifestJson: jsonb('manifest_json'),
 	currentVersion: text('current_version'),
 	gitBranch: text('git_branch'),

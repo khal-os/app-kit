@@ -15,6 +15,13 @@
 			"when": 1774390888756,
 			"tag": "0001_common_wasp",
 			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "7",
+			"when": 1774479917498,
+			"tag": "0002_remarkable_doctor_doom",
+			"breakpoints": true
 		}
 	]
 }
