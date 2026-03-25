@@ -1,7 +1,7 @@
 import type { NatsConnection } from '@khal-os/sdk/service';
 import { createService } from '@khal-os/sdk/service';
 import { agentLifecycleHandlers } from './agent-lifecycle';
-import { appsHandlers } from './apps';
+import { appsHandlers, seedCoreApps } from './apps';
 import { runGenieAsync } from './cli';
 import { commsHandlers } from './comms';
 import { directorySubscriptions } from './directory';
@@ -44,12 +44,17 @@ function loadAgentRegistry(): Record<string, { name: string; color: string; stat
 
 createService({
 	name: 'genie-control',
-	onReady: (_nc: NatsConnection) => {
+	onReady: async (_nc: NatsConnection) => {
 		nc = _nc;
 		tmux = new TmuxControl();
 		termProxy = createTerminalProxy(nc, tmux);
 
-		// Event stream disabled — polling is sufficient for the dashboard refresh cycle
+		// Seed core apps from package manifests into PG (idempotent)
+		try {
+			await seedCoreApps();
+		} catch (err) {
+			console.error('[genie-control] seedCoreApps failed (continuing):', err);
+		}
 	},
 
 	onShutdown: () => {

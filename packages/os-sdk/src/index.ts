@@ -17,7 +17,7 @@ export {
 	initDb as createDb,
 	isDbInitialized,
 } from './db/factory';
-export { runMigrations } from './db/migrate';
+export { runAllMigrations, runMigrations } from './db/migrate';
 export { interceptConsole, restoreConsole } from './service/console-intercept';
 export type { LogEntry, Logger } from './service/logger';
 export { createLogger } from './service/logger';
