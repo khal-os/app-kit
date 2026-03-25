@@ -28,7 +28,7 @@ const MACHINE_USER = {
 	object: 'user' as const,
 } as NonNullable<Awaited<ReturnType<typeof withAuth>>['user']>;
 
-/** Check if the request is from d3k's headless Chrome with OS_SECRET enabled. */
+/** Check if the request is from headless Chrome with OS_SECRET enabled. */
 function isHeadlessChrome(req: NextRequest): boolean {
 	return Boolean(process.env.OS_SECRET && (req.headers.get('user-agent') ?? '').includes('HeadlessChrome'));
 }

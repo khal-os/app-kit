@@ -135,7 +135,7 @@ const MOCK_ITEMS: PipelineItem[] = [
 		id: 'wish-010',
 		slug: 'ws-bridge-auth',
 		title: 'WebSocket Bridge Authentication',
-		summary: 'Add WorkOS session validation to the WS-to-NATS bridge with machine auth bypass for d3k headless Chrome.',
+		summary: 'Add WorkOS session validation to the WS-to-NATS bridge with machine auth bypass for headless Chrome.',
 		stage: 'review',
 		priority: 'high',
 		assignee: 'Sofia',
@@ -185,10 +185,10 @@ const MOCK_ITEMS: PipelineItem[] = [
 	},
 	{
 		id: 'wish-014',
-		slug: 'dev3000-browser-monitoring',
-		title: 'dev3000 Browser Monitoring',
+		slug: 'qa-browser-monitoring',
+		title: 'QA Browser Monitoring',
 		summary:
-			'Headless Chrome + CDP integration for d3k: server logs, browser console, network requests, DOM events, and screenshots.',
+			'Headless Chrome + CDP integration for QA: server logs, browser console, network requests, DOM events, and screenshots.',
 		stage: 'ship',
 		priority: 'critical',
 		assignee: 'Sofia',
