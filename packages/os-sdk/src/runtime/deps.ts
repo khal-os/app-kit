@@ -220,4 +220,4 @@ export function isBinaryCached(name: string, version: string, binDir: string): b
 	return existsSync(join(binDir, `${name}-${version}`));
 }
 
-export { detectPlatform, detectArch, type Platform, type Arch };
+export { type Arch, detectArch, detectPlatform, type Platform };
