@@ -17,7 +17,17 @@ export { AWSRuntime } from './aws';
 export { AzureRuntime } from './azure';
 export { BaseRuntime } from './base';
 // Dependency helpers
-export { defaultBinDir, ensureBinary, getBunUrl, getNatsUrl, isBinaryCached } from './deps';
+export {
+	type Arch,
+	defaultBinDir,
+	detectArch,
+	detectPlatform,
+	ensureBinary,
+	getBunUrl,
+	getNatsUrl,
+	isBinaryCached,
+	type Platform,
+} from './deps';
 export { DockerRuntime } from './docker';
 // Factory
 export { createRuntime, detectBestRuntime } from './factory';
