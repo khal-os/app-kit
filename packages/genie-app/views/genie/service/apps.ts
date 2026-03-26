@@ -13,7 +13,8 @@
 
 import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { getDatabaseUrl, getDb, initDb, isDbInitialized } from '@khal-os/sdk';
+import { getDatabaseUrl } from '@khal-os/sdk/config';
+import { getDb, initDb, isDbInitialized } from '@khal-os/sdk/db';
 import { and, avg, count, eq, inArray, sql } from '@khal-os/sdk/db/operators';
 import * as schema from '@khal-os/sdk/db/schema';
 import type { ServiceHandler } from '@khal-os/sdk/service';

@@ -16,7 +16,8 @@ let sessionManager: ReturnType<typeof createSessionManager>;
 createService({
 	name: 'pty-service',
 	onReady: (nc: NatsConnection) => {
-		sessionManager = createSessionManager(nc);
+		const orgId = process.env.KHAL_INSTANCE_ID || 'default';
+		sessionManager = createSessionManager(nc, orgId);
 	},
 	onShutdown: () => {
 		sessionManager?.shutdown();
@@ -24,7 +25,7 @@ createService({
 	subscriptions: [
 		// --- os.pty.create (request-reply) ---
 		{
-			subject: 'os.pty.create',
+			subject: 'khal.*.pty.create',
 			handler: async (msg) => {
 				let request: PtyCreateRequest & { _authUserId?: string } = {};
 				if (msg.data.length > 0) {
@@ -57,7 +58,7 @@ createService({
 		},
 		// --- os.pty.destroy (request-reply) ---
 		{
-			subject: 'os.pty.destroy',
+			subject: 'khal.*.pty.destroy',
 			handler: (msg) => {
 				const request = msg.json<PtyDestroyRequest & { _authUserId?: string }>();
 				const userId = request._authUserId;
@@ -71,7 +72,7 @@ createService({
 		},
 		// --- os.pty.list (request-reply) ---
 		{
-			subject: 'os.pty.list',
+			subject: 'khal.*.pty.list',
 			handler: (msg) => {
 				let listRequest: PtyListRequest & { _authUserId?: string } = {};
 				if (msg.data.length > 0) {
@@ -83,9 +84,9 @@ createService({
 		},
 		// --- os.pty.*.input (wildcard sessionId, fire-and-forget) ---
 		{
-			subject: 'os.pty.*.input',
+			subject: 'khal.*.pty.*.input',
 			handler: (msg) => {
-				const sessionId = msg.subject.split('.')[2];
+				const sessionId = msg.subject.split('.')[3];
 				let data = '';
 				let userId: string | undefined;
 
@@ -102,9 +103,9 @@ createService({
 		},
 		// --- os.pty.*.resize (wildcard, fire-and-forget) ---
 		{
-			subject: 'os.pty.*.resize',
+			subject: 'khal.*.pty.*.resize',
 			handler: (msg) => {
-				const sessionId = msg.subject.split('.')[2];
+				const sessionId = msg.subject.split('.')[3];
 				const request = msg.json<PtyResizeRequest & { _authUserId?: string }>();
 
 				if (sessionId) {
@@ -115,9 +116,9 @@ createService({
 		// --- os.pty.*.replay (wildcard, fire-and-forget) ---
 		// Client sends this AFTER subscribing to buffer/buffer-end subjects
 		{
-			subject: 'os.pty.*.replay',
+			subject: 'khal.*.pty.*.replay',
 			handler: (msg) => {
-				const sessionId = msg.subject.split('.')[2];
+				const sessionId = msg.subject.split('.')[3];
 				let userId: string | undefined;
 				if (msg.data.length > 0) {
 					const request = msg.json<PtyReplayRequest & { _authUserId?: string }>();
