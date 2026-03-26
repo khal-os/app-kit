@@ -2,7 +2,7 @@
  * LocalRuntime — runs KhalOS services as local child processes.
  *
  * Manages: NATS server, service-loader, ws-bridge, Next.js dev server.
- * Downloads NATS + Bun binaries via deps.ts if not cached.
+ * Downloads NATS binary via deps.ts if not cached.
  * Uses Node.js child_process, net, fs, os — server-side only.
  */
 
@@ -12,7 +12,7 @@ import { createConnection } from 'node:net';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { BaseRuntime } from './base';
-import { detectArch, detectPlatform, ensureBinary, getBunUrl, getNatsUrl, isBinaryCached } from './deps';
+import { detectArch, detectPlatform, ensureBinary, getNatsUrl, isBinaryCached } from './deps';
 import type { HealthStatus, RuntimeConfig, RuntimeHealth, ServiceHealth } from './types';
 
 // ---------------------------------------------------------------------------
@@ -20,7 +20,6 @@ import type { HealthStatus, RuntimeConfig, RuntimeHealth, ServiceHealth } from '
 // ---------------------------------------------------------------------------
 
 const NATS_VERSION = '2.10.24';
-const BUN_VERSION = '1.2.5';
 
 const NATS_PORT = 4222;
 const WS_BRIDGE_PORT = 4280;
@@ -114,7 +113,6 @@ export class LocalRuntime extends BaseRuntime {
 
 	private children: ManagedProcess[] = [];
 	private natsBin = '';
-	private bunBin = '';
 	private dataDir: string;
 	private startedAt: number | undefined;
 
@@ -141,13 +139,11 @@ export class LocalRuntime extends BaseRuntime {
 			getNatsUrl(NATS_VERSION, platform, arch),
 			emitter
 		);
-
-		this.bunBin = await ensureBinary('bun', BUN_VERSION, binDir, getBunUrl(BUN_VERSION, platform, arch), emitter);
 	}
 
 	async depsReady(): Promise<boolean> {
 		const binDir = join(this.dataDir, 'bin');
-		return isBinaryCached('nats-server', NATS_VERSION, binDir) && isBinaryCached('bun', BUN_VERSION, binDir);
+		return isBinaryCached('nats-server', NATS_VERSION, binDir);
 	}
 
 	// -----------------------------------------------------------------------
@@ -178,20 +174,20 @@ export class LocalRuntime extends BaseRuntime {
 		await waitForPort(NATS_PORT);
 
 		// 2. Service loader (discovers and runs KhalOS services)
-		this.spawnChild('services', this.bunBin, ['run', 'src/lib/service-loader.ts'], {
+		this.spawnChild('services', 'npx', ['tsx', 'src/lib/service-loader.ts'], {
 			cwd: projectRoot,
 			env,
 		});
 
 		// 3. WebSocket bridge (NATS <-> browser)
-		this.spawnChild('ws-bridge', this.bunBin, ['run', 'src/lib/ws-bridge.ts'], {
+		this.spawnChild('ws-bridge', 'npx', ['tsx', 'src/lib/ws-server.ts'], {
 			cwd: projectRoot,
 			env,
 			port: WS_BRIDGE_PORT,
 		});
 
 		// 4. Next.js dev server
-		this.spawnChild('next', this.bunBin, ['run', 'next', 'dev', '--port', String(port)], {
+		this.spawnChild('next', 'npx', ['next', 'dev', '--port', String(port)], {
 			cwd: projectRoot,
 			env,
 			port,
