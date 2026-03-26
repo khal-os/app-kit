@@ -3,10 +3,9 @@
  *
  * Each app calls provisionAppSchema() on boot to create its isolated
  * PostgreSQL schema + role via pgserve. Idempotent, safe for restarts.
- *
- * Requires Bun runtime (uses Bun.SQL for the pgserve admin connection).
  */
 
+import pg from 'pg';
 import { getDatabaseUrl } from '../config';
 
 export interface AppSchemaConfig {
@@ -20,25 +19,15 @@ export async function provisionAppSchema(config: AppSchemaConfig): Promise<{ cre
 	const pgserveModule = 'pgserve';
 	// biome-ignore lint/suspicious/noExplicitAny: optional runtime dependency, no types guaranteed
 	const { initCatalog, provisionSchema } = (await import(pgserveModule)) as any;
-	// Bun.SQL is only available at runtime under Bun — indirect import to skip tsc module resolution
-	const bunModule = 'bun';
-	// biome-ignore lint/suspicious/noExplicitAny: Bun-only runtime API, no type declarations available
-	const { SQL } = (await import(bunModule)) as any;
 
-	const url = new URL(getDatabaseUrl());
-	const adminSql = new SQL({
-		hostname: url.hostname,
-		port: Number(url.port),
-		database: url.pathname.slice(1),
-		username: url.username,
-		password: url.password,
-	});
+	const client = new pg.Client({ connectionString: getDatabaseUrl() });
+	await client.connect();
 
 	try {
-		await initCatalog(adminSql);
-		const result = await provisionSchema(adminSql, config);
+		await initCatalog(client);
+		const result = await provisionSchema(client, config);
 		return { created: result.created };
 	} finally {
-		await adminSql.close();
+		await client.end();
 	}
 }
