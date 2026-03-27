@@ -96,7 +96,10 @@ export async function seedCoreApps(): Promise<void> {
 		const entries = readdirSync(packagesDir, { withFileTypes: true });
 		for (const entry of entries) {
 			if (!entry.isDirectory()) continue;
-			const manifestPath = resolve(packagesDir, entry.name, 'manifest.ts');
+			const manifestTs = resolve(packagesDir, entry.name, 'manifest.ts');
+			const manifestJs = resolve(packagesDir, entry.name, 'manifest.js');
+			// Try compiled .js first (binary mode), fall back to .ts (dev mode)
+			const manifestPath = existsSync(manifestJs) ? manifestJs : manifestTs;
 			if (!existsSync(manifestPath)) continue;
 
 			try {
