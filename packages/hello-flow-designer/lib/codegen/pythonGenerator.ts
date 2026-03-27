@@ -47,11 +47,11 @@ function formatMessage(msg: MessageJson): string {
 function formatProperty(prop: Record<string, unknown>, indent: string = '            '): string {
 	const parts: string[] = [];
 	if (prop.type) parts.push(`"type": "${prop.type}"`);
-	if (prop.description) parts.push(`"description": "${escapePythonString(prop.description)}"`);
+	if (prop.description) parts.push(`"description": "${escapePythonString(prop.description as string)}"`);
 	if (prop.enum) parts.push(`"enum": ${JSON.stringify(prop.enum)}`);
 	if (prop.minimum !== undefined) parts.push(`"minimum": ${prop.minimum}`);
 	if (prop.maximum !== undefined) parts.push(`"maximum": ${prop.maximum}`);
-	if (prop.pattern) parts.push(`"pattern": "${escapePythonString(prop.pattern)}"`);
+	if (prop.pattern) parts.push(`"pattern": "${escapePythonString(prop.pattern as string)}"`);
 	return `{\n${indent}    ${parts.join(`,\n${indent}    `)}\n${indent}}`;
 }
 

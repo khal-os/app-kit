@@ -19,7 +19,7 @@ interface ConditionItemProps {
 
 export function ConditionItem({
 	condition,
-	_condIndex,
+	condIndex: _condIndex,
 	availableNodeIds,
 	hasInvalidConditionNode,
 	onUpdate,

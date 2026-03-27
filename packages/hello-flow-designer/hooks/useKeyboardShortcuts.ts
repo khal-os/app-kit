@@ -20,7 +20,7 @@ interface KeyboardShortcutsProps {
  */
 export function useKeyboardShortcuts({
 	nodes,
-	_edges,
+	edges: _edges,
 	selectedNodeId,
 	selectedFunctionIndex,
 	setNodes,

@@ -42,7 +42,8 @@ export function useAgents() {
 
 	useEffect(() => {
 		if (!connected) return;
-		const unsub = subscribe('hello.*.event.call_state', (msg: { slug?: string; status?: AgentConfig['status'] }) => {
+		const unsub = subscribe('hello.*.event.call_state', (data: unknown) => {
+			const msg = data as { slug?: string; status?: AgentConfig['status'] };
 			if (!msg.slug || !msg.status) return;
 			setAgents((prev) => prev.map((a) => (a.slug === msg.slug ? { ...a, status: msg.status! } : a)));
 		});

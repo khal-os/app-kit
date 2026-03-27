@@ -13,7 +13,7 @@ interface MessageItemProps {
 	onRemove: () => void;
 }
 
-export function MessageItem({ message, _index, onUpdate, onRemove }: MessageItemProps) {
+export function MessageItem({ message, index: _index, onUpdate, onRemove }: MessageItemProps) {
 	const messageRoleId = useId();
 	const messageContentId = useId();
 

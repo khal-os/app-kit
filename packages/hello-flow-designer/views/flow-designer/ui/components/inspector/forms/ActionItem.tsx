@@ -13,7 +13,7 @@ interface ActionItemProps {
 	onRemove: () => void;
 }
 
-export function ActionItem({ action, _index, onUpdate, onRemove }: ActionItemProps) {
+export function ActionItem({ action, index: _index, onUpdate, onRemove }: ActionItemProps) {
 	const actionTypeId = useId();
 	const actionHandlerId = useId();
 	const actionTextId = useId();
