@@ -3,6 +3,7 @@ import json
 import signal
 import sys
 import os
+import time
 from dataclasses import asdict
 from nats.aio.client import Client as NATS
 from agents.registry import AgentRegistry, AgentConfig
@@ -10,10 +11,22 @@ from agents.lifecycle import AgentLifecycle
 
 
 async def main():
+    from dotenv import load_dotenv
+    load_dotenv()
+
     nc = NATS()
     nats_url = os.environ.get("NATS_URL", "nats://localhost:4222")
     await nc.connect(nats_url)
     print("[hello-voice] HELLO voice engine ready")
+
+    # Validate environment
+    missing = []
+    for var in ["GEMINI_API_KEY"]:
+        if not os.environ.get(var):
+            missing.append(var)
+    if missing:
+        print(f"[hello-voice] WARNING: Missing env vars: {', '.join(missing)}")
+        print("[hello-voice] Voice calls will fail. Set these in .env or environment.")
 
     if "--test-nats" in sys.argv:
         await publish_test_events(nc)
@@ -141,6 +154,40 @@ async def main():
 
     await nc.subscribe("hello.call.start", cb=handle_call_start)
     await nc.subscribe("hello.call.hangup", cb=handle_call_hangup)
+
+    # Health check — publish to khal._internal.system.health
+    async def publish_health():
+        while not stop.is_set():
+            health = {
+                "service": "hello-voice",
+                "status": "healthy",
+                "agents_registered": len(registry.list_all()),
+                "agents_running": lifecycle.running_count,
+                "active_calls": len(active_calls),
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            }
+            await nc.publish("khal._internal.system.health", json.dumps(health).encode())
+            await asyncio.sleep(30)
+
+    asyncio.create_task(publish_health())
+
+    # Stale session cleanup — terminate calls inactive for 10 minutes
+    call_last_event: dict[str, float] = {}
+
+    async def cleanup_stale():
+        while not stop.is_set():
+            now = time.time()
+            stale = [slug for slug, ts in call_last_event.items() if now - ts > 600]
+            for slug in stale:
+                print(f"[hello-voice] stale session detected: {slug} — auto-terminating")
+                if slug in active_calls:
+                    active_calls.pop(slug)
+                if lifecycle.is_running(slug):
+                    await lifecycle.stop(slug)
+                call_last_event.pop(slug, None)
+            await asyncio.sleep(60)
+
+    asyncio.create_task(cleanup_stale())
 
     # Duration limit checker (runs every 30s)
     async def check_limits():
