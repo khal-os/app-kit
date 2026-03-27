@@ -9,6 +9,7 @@ dependencies = [
     "python-dotenv",
     "fastapi",
     "uvicorn",
+    "twilio",
 ]
 
 [project.scripts]

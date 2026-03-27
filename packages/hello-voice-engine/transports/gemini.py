@@ -1,44 +1,67 @@
-"""Gemini 3.1 Flash Live configuration for speech-to-speech."""
+"""GeminiLiveLLMService configuration for HELLO voice engine.
+
+Gemini Live replaces the entire STT+LLM+TTS chain with native speech-to-speech.
+Handles audio conversion, transcription, function calling, and voice synthesis
+in a single model (~200-350ms first-token latency, $0.023/min).
+"""
 import os
-from pipecat.services.google import GeminiLiveLLMService
+
+from agents.registry import AgentConfig
 
 
-def create_gemini_live(
-    voice_id: str = "Kore",
-    language: str = "pt-BR",
-    system_prompt: str = "",
-    temperature: float = 0.7,
-) -> GeminiLiveLLMService:
-    """Create a Gemini Live LLM service for speech-to-speech.
+def create_gemini_live(agent: AgentConfig):
+    """Create a configured GeminiLiveLLMService for the given agent."""
+    from pipecat.services.google import GeminiLiveLLMService
 
-    Replaces the entire STT+LLM+TTS chain with native speech-to-speech.
-    """
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY environment variable is required")
 
-    from pipecat.services.google import InputParams, GeminiLiveTranscriptionSettings, TranscriptionSettings
-
-    llm = GeminiLiveLLMService(
-        model="gemini-3.1-flash-live-preview",
-        voice_id=voice_id,
+    kwargs = dict(
         api_key=api_key,
-        system_instruction=system_prompt or f"You are a helpful voice assistant. Speak in {language}. Be concise and natural.",
-        params=InputParams(
-            language=language,
-            temperature=temperature,
-        ),
-        transcription_settings=GeminiLiveTranscriptionSettings(
-            input_transcription_settings=TranscriptionSettings(),
-            output_transcription_settings=TranscriptionSettings(),
-        ),
+        model=agent.model,
+        voice_id=agent.voice_id,
+        system_instruction=agent.system_prompt or _default_prompt(agent.language),
     )
 
-    return llm
+    # Enable both input and output transcription for co-pilot feed
+    try:
+        from pipecat.services.google import (
+            GeminiLiveTranscriptionSettings,
+            TranscriptionSettings,
+        )
+        kwargs["transcription_settings"] = GeminiLiveTranscriptionSettings(
+            input_transcription_settings=TranscriptionSettings(),
+            output_transcription_settings=TranscriptionSettings(),
+        )
+    except ImportError:
+        pass
+
+    # Set language and temperature via InputParams
+    try:
+        from pipecat.services.google import InputParams
+        kwargs["params"] = InputParams(
+            language=agent.language,
+            temperature=0.7,
+        )
+    except ImportError:
+        pass
+
+    return GeminiLiveLLMService(**kwargs)
 
 
-def validate_config() -> dict:
-    """Validate Gemini configuration."""
+def validate_config() -> list[str]:
+    """Check Gemini configuration without creating a service."""
+    errors = []
     if not os.environ.get("GEMINI_API_KEY"):
-        return {"valid": False, "issues": ["GEMINI_API_KEY not set"]}
-    return {"valid": True, "message": "Gemini config valid"}
+        errors.append("GEMINI_API_KEY not set")
+    return errors
+
+
+def _default_prompt(language: str) -> str:
+    if language.startswith("pt"):
+        return (
+            "Você é um assistente de voz prestativo e profissional. "
+            "Fale em português do Brasil de forma clara e natural."
+        )
+    return "You are a helpful and professional voice assistant."

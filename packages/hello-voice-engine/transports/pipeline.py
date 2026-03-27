@@ -1,27 +1,52 @@
-"""Voice pipeline builder — assembles transport, LLM, and processors."""
-from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+"""Pipeline builder — assembles Pipecat pipeline for voice calls.
+
+Pipeline structure:
+  transport.input() -> gemini_live -> nats_relay -> transport.output()
+
+GeminiLive sits in the middle as the speech-to-speech engine.
+NatsRelay captures transcription/text events and injects NATS commands.
+Transport handles audio I/O with format conversion (mu-law <-> PCM).
+"""
+from agents.registry import AgentConfig
+from processors.nats_relay import NatsRelay
+from transports.gemini import create_gemini_live
+from transports.twilio import create_twilio_transport
 
 
-def build_pipeline(transport, llm, nats_relay, vad=None) -> Pipeline:
-    """Build a Pipecat pipeline with transport, LLM, and NATS relay.
+async def build_and_run_pipeline(
+    websocket,
+    stream_sid: str,
+    nc,
+    agent: AgentConfig,
+    call_id: str,
+):
+    """Build and run a complete voice pipeline for one call.
 
-    Pipeline flow:
-        Transport.input() → nats_relay → LLM → nats_relay → Transport.output()
+    Blocks until the pipeline finishes (call ends, WS disconnects, or error).
     """
-    processors = [transport.input()]
+    from pipecat.pipeline.pipeline import Pipeline
+    from pipecat.pipeline.runner import PipelineRunner
+    from pipecat.pipeline.task import PipelineTask, PipelineParams
 
-    if vad:
-        processors.append(vad)
+    transport = create_twilio_transport(websocket, stream_sid)
+    gemini = create_gemini_live(agent)
+    relay = NatsRelay(nc=nc, agent_id=agent.slug)
 
-    processors.extend([nats_relay, llm, nats_relay, transport.output()])
+    pipeline = Pipeline([
+        transport.input(),
+        gemini,
+        relay,
+        transport.output(),
+    ])
 
-    return Pipeline(processors)
-
-
-def create_pipeline_task(pipeline: Pipeline, allow_interruptions: bool = True) -> PipelineTask:
-    """Create a pipeline task with standard parameters."""
-    return PipelineTask(
+    task = PipelineTask(
         pipeline,
-        params=PipelineParams(allow_interruptions=allow_interruptions),
+        params=PipelineParams(allow_interruptions=True),
     )
+
+    await relay.start()
+    try:
+        runner = PipelineRunner(handle_sigint=False)
+        await runner.run(task)
+    finally:
+        await relay.stop()

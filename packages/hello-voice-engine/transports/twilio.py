@@ -1,123 +1,138 @@
-"""Twilio outbound transport for voice calls."""
+"""Twilio transport configuration and outbound call management.
+
+Handles:
+- FastAPIWebsocketTransport with TwilioFrameSerializer (mu-law 8kHz <-> PCM)
+- Outbound call placement via Twilio REST API
+- Call termination, DTMF, and transfer via REST API
+"""
 import os
-from pipecat.transports.services.fastapi_websocket import FastAPIWebsocketTransport, FastAPIWebsocketParams
-from pipecat.serializers.twilio import TwilioFrameSerializer
+from dataclasses import dataclass
 
 
-def create_twilio_transport() -> FastAPIWebsocketTransport:
-    """Create a Twilio WebSocket transport for outbound calls."""
-    return FastAPIWebsocketTransport(
-        params=FastAPIWebsocketParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            serializer=TwilioFrameSerializer(),
+@dataclass
+class TwilioConfig:
+    """Twilio configuration from environment variables."""
+    account_sid: str = ""
+    auth_token: str = ""
+    phone_number: str = ""
+    ws_public_url: str = ""
+
+    @classmethod
+    def from_env(cls) -> "TwilioConfig":
+        return cls(
+            account_sid=os.environ.get("TWILIO_ACCOUNT_SID", ""),
+            auth_token=os.environ.get("TWILIO_AUTH_TOKEN", ""),
+            phone_number=os.environ.get("TWILIO_PHONE_NUMBER", ""),
+            ws_public_url=os.environ.get("HELLO_WS_PUBLIC_URL", ""),
         )
-    )
+
+    def validate(self) -> list[str]:
+        errors = []
+        if not self.account_sid:
+            errors.append("TWILIO_ACCOUNT_SID not set")
+        if not self.auth_token:
+            errors.append("TWILIO_AUTH_TOKEN not set")
+        if not self.phone_number:
+            errors.append("TWILIO_PHONE_NUMBER not set")
+        if not self.ws_public_url:
+            errors.append("HELLO_WS_PUBLIC_URL not set (public WebSocket URL for Twilio callback)")
+        return errors
 
 
-async def place_outbound_call(to_number: str, stream_url: str) -> dict:
-    """Place an outbound call via Twilio REST API.
+def create_twilio_transport(websocket, stream_sid: str):
+    """Create FastAPIWebsocketTransport with TwilioFrameSerializer.
 
     Args:
-        to_number: E.164 phone number to call
-        stream_url: WebSocket URL for media streaming
+        websocket: The accepted FastAPI WebSocket connection from Twilio
+        stream_sid: Twilio stream SID from the 'start' event
 
-    Returns:
-        dict with call_sid and status
+    Pipecat handles mu-law 8kHz (Twilio) <-> PCM 16/24kHz (Gemini) conversion
+    transparently via the serializer.
     """
-    try:
-        from twilio.rest import Client
-    except ImportError:
-        return {"error": "twilio package not installed"}
+    from pipecat.transports.services.fastapi_websocket import (
+        FastAPIWebsocketTransport,
+        FastAPIWebsocketParams,
+    )
+    from pipecat.serializers.twilio import TwilioFrameSerializer
+    from pipecat.audio.vad.silero import SileroVADAnalyzer
 
-    account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
-    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
-    from_number = os.environ.get("TWILIO_PHONE_NUMBER")
-
-    if not all([account_sid, auth_token, from_number]):
-        return {"error": "Missing Twilio credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)"}
-
-    client = Client(account_sid, auth_token)
-
-    twiml = f"""
-    <Response>
-        <Connect>
-            <Stream url="{stream_url}" />
-        </Connect>
-    </Response>
-    """
-
-    call = client.calls.create(
-        to=to_number,
-        from_=from_number,
-        twiml=twiml,
+    return FastAPIWebsocketTransport(
+        websocket=websocket,
+        params=FastAPIWebsocketParams(
+            audio_out_enabled=True,
+            add_wav_header=False,
+            vad_enabled=True,
+            vad_analyzer=SileroVADAnalyzer(),
+            vad_audio_passthrough=True,
+            serializer=TwilioFrameSerializer(stream_sid),
+        ),
     )
 
-    return {"call_sid": call.sid, "status": call.status}
 
+class TwilioCallManager:
+    """Manages Twilio REST API operations for outbound calls.
 
-async def send_dtmf(call_sid: str, digits: str) -> dict:
-    """Send DTMF digits to an active call via Twilio REST API."""
-    try:
-        from twilio.rest import Client
-    except ImportError:
-        return {"error": "twilio package not installed"}
+    Uses a shared client instance to avoid re-authenticating on every call.
+    """
 
-    account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
-    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
+    def __init__(self, config: TwilioConfig):
+        self._config = config
+        self._client = None
 
-    client = Client(account_sid, auth_token)
+    @property
+    def client(self):
+        if self._client is None:
+            from twilio.rest import Client
+            self._client = Client(self._config.account_sid, self._config.auth_token)
+        return self._client
 
-    twiml = f'<Response><Play digits="{digits}"/></Response>'
-    client.calls(call_sid).update(twiml=twiml)
+    def make_outbound_call(self, phone_number: str, call_id: str) -> str:
+        """Place an outbound call. Returns Twilio call_sid.
 
-    return {"ok": True, "digits": digits}
+        Flow: Twilio REST API -> TwiML <Connect><Stream> -> our WS endpoint
+        """
+        ws_url = f"{self._config.ws_public_url}/twilio/ws/{call_id}"
+        twiml = (
+            f'<Response>'
+            f'<Connect><Stream url="{ws_url}"/></Connect>'
+            f'</Response>'
+        )
+        call = self.client.calls.create(
+            to=phone_number,
+            from_=self._config.phone_number,
+            twiml=twiml,
+        )
+        return call.sid
 
+    def hangup(self, call_sid: str):
+        """Terminate an active Twilio call."""
+        self.client.calls(call_sid).update(status="completed")
 
-async def hangup_call(call_sid: str) -> dict:
-    """Terminate a Twilio call."""
-    try:
-        from twilio.rest import Client
-    except ImportError:
-        return {"error": "twilio package not installed"}
+    def send_dtmf(self, call_sid: str, digits: str, call_id: str):
+        """Send DTMF tones via Twilio REST API.
 
-    account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
-    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
+        Briefly interrupts the media stream, plays the digits,
+        then reconnects the stream. Known V1 limitation.
+        """
+        ws_url = f"{self._config.ws_public_url}/twilio/ws/{call_id}"
+        twiml = (
+            f'<Response>'
+            f'<Play digits="{digits}"/>'
+            f'<Connect><Stream url="{ws_url}"/></Connect>'
+            f'</Response>'
+        )
+        self.client.calls(call_sid).update(twiml=twiml)
 
-    client = Client(account_sid, auth_token)
-    client.calls(call_sid).update(status="completed")
-
-    return {"ok": True}
-
-
-async def transfer_call(call_sid: str, to_number: str) -> dict:
-    """Transfer an active call to another number."""
-    try:
-        from twilio.rest import Client
-    except ImportError:
-        return {"error": "twilio package not installed"}
-
-    account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
-    auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
-
-    client = Client(account_sid, auth_token)
-
-    twiml = f'<Response><Dial>{to_number}</Dial></Response>'
-    client.calls(call_sid).update(twiml=twiml)
-
-    return {"ok": True, "transferred_to": to_number}
+    def transfer(self, call_sid: str, target_number: str):
+        """Transfer the call to another number. Ends the voice pipeline."""
+        twiml = f'<Response><Dial>{target_number}</Dial></Response>'
+        self.client.calls(call_sid).update(twiml=twiml)
 
 
 def validate_config() -> dict:
     """Validate Twilio configuration without making a call."""
-    issues = []
-    if not os.environ.get("TWILIO_ACCOUNT_SID"):
-        issues.append("TWILIO_ACCOUNT_SID not set")
-    if not os.environ.get("TWILIO_AUTH_TOKEN"):
-        issues.append("TWILIO_AUTH_TOKEN not set")
-    if not os.environ.get("TWILIO_PHONE_NUMBER"):
-        issues.append("TWILIO_PHONE_NUMBER not set")
-
-    if issues:
-        return {"valid": False, "issues": issues}
+    config = TwilioConfig.from_env()
+    errors = config.validate()
+    if errors:
+        return {"valid": False, "issues": errors}
     return {"valid": True, "message": "Twilio config valid"}

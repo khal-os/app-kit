@@ -36,5 +36,8 @@ AGENT_CONFIG = "hello.agent.config"
 
 # Call management
 CALL_START = "hello.call.start"
+CALL_HANGUP = "hello.call.hangup"
+CALL_DTMF = "hello.call.dtmf"
+CALL_TRANSFER = "hello.call.transfer"
 CALL_MONITOR = "hello.call.monitor"
 CALL_METRICS = "hello.call.metrics"
