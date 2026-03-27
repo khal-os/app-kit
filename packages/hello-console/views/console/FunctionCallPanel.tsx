@@ -1,8 +1,8 @@
 'use client';
 
+import { Spinner } from '@khal-os/ui';
 import { CheckCircle, ChevronRight, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Spinner } from '@/components/ui/spinner';
 import type { FunctionCallEntry } from './types';
 
 interface FunctionCallPanelProps {

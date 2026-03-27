@@ -1,7 +1,7 @@
 'use client';
 
+import { EmptyState } from '@khal-os/ui';
 import { Eye, Hammer, Inbox, Lightbulb, Rocket, ShieldCheck, Sparkles } from 'lucide-react';
-import { EmptyState } from '@/components/os-primitives/empty-state';
 import type { PipelineItem, Stage, StageIconName } from '../types';
 import { PipelineCard } from './PipelineCard';
 

@@ -1,7 +1,7 @@
 'use client';
 
+import { Separator } from '@khal-os/ui';
 import { Radio } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
 import { ActiveSubs } from './ActiveSubs';
 import { useNatsViewer } from './nats-viewer-context';
 import { SubjectCatalog } from './SubjectCatalog';

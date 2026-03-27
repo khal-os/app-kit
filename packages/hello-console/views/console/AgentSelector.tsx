@@ -1,10 +1,8 @@
 'use client';
 
+import { Badge, Button, Spinner } from '@khal-os/ui';
 import { RefreshCw } from 'lucide-react';
 import { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
 import type { AgentInfo } from './types';
 
 interface AgentSelectorProps {

@@ -1,10 +1,8 @@
 'use client';
 
+import { Button, Input, Spinner } from '@khal-os/ui';
 import { Inbox } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Spinner } from '@/components/ui/spinner';
 import { useKhalAuth } from '@/lib/auth/use-auth';
 import { useNats } from '@/lib/hooks/use-nats';
 import { SUBJECTS } from '@/lib/subjects';

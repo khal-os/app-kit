@@ -17,6 +17,9 @@
 			}
 		]
 	},
+	"dependencies": {
+		"@khal-os/ui": "workspace:*"
+	},
 	"peerDependencies": {
 		"react": ">=19"
 	}

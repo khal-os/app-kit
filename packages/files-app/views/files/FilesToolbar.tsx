@@ -1,8 +1,8 @@
 'use client';
 
+import { Toolbar } from '@khal-os/ui';
 import { ChevronLeft, ChevronRight, FolderPlus, Grid, List, RefreshCw, Upload } from 'lucide-react';
 import { useCallback } from 'react';
-import { Toolbar } from '@/components/os-primitives/toolbar';
 
 export type ViewMode = 'grid' | 'list';
 

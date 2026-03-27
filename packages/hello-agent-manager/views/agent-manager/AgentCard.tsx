@@ -1,9 +1,7 @@
 'use client';
 
+import { Badge, Button, GlassCard } from '@khal-os/ui';
 import { Globe, Mic, Pencil, Play, Square, Trash2 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { GlassCard } from '@/components/ui/glass-card';
 import { CostBar } from './CostBar';
 import type { AgentConfig } from './types';
 

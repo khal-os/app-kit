@@ -1,10 +1,6 @@
 'use client';
 
-import { Avatar } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { GlassCard } from '@/components/ui/glass-card';
-import { ProgressBar } from '@/components/ui/progress-bar';
-import { StatusDot } from '@/components/ui/status-dot';
+import { Avatar, Badge, GlassCard, ProgressBar, StatusDot } from '@khal-os/ui';
 import { cn } from '@/lib/utils';
 import type { PipelineCardProps, Priority } from '../types';
 

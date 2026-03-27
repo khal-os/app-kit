@@ -1,10 +1,8 @@
 'use client';
 
+import { EmptyState, Spinner, StatusBar } from '@khal-os/ui';
 import { AlertTriangle, FolderOpen, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { EmptyState } from '@/components/os-primitives/empty-state';
-import { StatusBar } from '@/components/os-primitives/status-bar';
-import { Spinner } from '@/components/ui/spinner';
 import { validateFilename } from '@/lib/files/filename-validation';
 import { type ContextMenuState, FilesContextMenu } from './ContextMenu';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';

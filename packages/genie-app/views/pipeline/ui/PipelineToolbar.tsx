@@ -1,17 +1,17 @@
 'use client';
 
-import { Filter, RefreshCw, Search, X } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
 import {
+	Button,
 	DropdownMenu,
 	DropdownMenuCheckboxItem,
 	DropdownMenuContent,
 	DropdownMenuLabel,
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
+	Input,
+} from '@khal-os/ui';
+import { Filter, RefreshCw, Search, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Priority } from '../types';
 
 interface PipelineToolbarProps {

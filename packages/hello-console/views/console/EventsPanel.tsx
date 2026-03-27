@@ -1,8 +1,7 @@
 'use client';
 
+import { Badge, Input } from '@khal-os/ui';
 import { useEffect, useRef, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import type { EventEntry } from './types';
 
 interface EventsPanelProps {

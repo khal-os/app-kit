@@ -1,8 +1,7 @@
 'use client';
 
+import { Button, Input } from '@khal-os/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import type { AgentConfig } from './types';
 
 const VOICES = ['Kore', 'Charon', 'Fenrir', 'Aoede', 'Puck', 'Leda'] as const;
