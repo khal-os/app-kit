@@ -108,6 +108,8 @@ export const SUBJECTS = {
 		get: () => `${PREFIX}.apps.get`,
 		register: () => `${PREFIX}.apps.register`,
 		unregister: () => `${PREFIX}.apps.unregister`,
+		disable: () => `${PREFIX}.apps.disable`,
+		enable: () => `${PREFIX}.apps.enable`,
 		store: {
 			list: () => `${PREFIX}.apps.store.list`,
 			submit: () => `${PREFIX}.apps.store.submit`,
