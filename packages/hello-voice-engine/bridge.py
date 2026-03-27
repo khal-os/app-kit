@@ -87,6 +87,58 @@ async def main():
     await nc.subscribe("hello.agent.delete", cb=handle_agent_delete)
     await nc.subscribe("hello.agent.config", cb=handle_agent_config)
 
+    # Track active calls
+    active_calls: dict[str, dict] = {}
+
+    async def handle_call_start(msg):
+        data = json.loads(msg.data)
+        slug = data.get("agent")
+        number = data.get("number")
+        dry_run = data.get("dry_run", False)
+
+        if dry_run:
+            from transports.twilio import validate_config as validate_twilio
+            from transports.gemini import validate_config as validate_gemini
+            twilio_result = validate_twilio()
+            gemini_result = validate_gemini()
+            valid = twilio_result.get("valid", False) and gemini_result.get("valid", False)
+            issues = twilio_result.get("issues", []) + gemini_result.get("issues", [])
+            if valid:
+                await msg.respond(json.dumps({"ok": True, "message": "Config valid. Twilio + Gemini ready. Use without --dry-run to place call."}).encode())
+            else:
+                await msg.respond(json.dumps({"ok": False, "issues": issues}).encode())
+            return
+
+        agent = registry.get(slug)
+        if not agent:
+            await msg.respond(json.dumps({"ok": False, "error": f"Agent '{slug}' not found"}).encode())
+            return
+
+        if not lifecycle.is_running(slug):
+            ok, reason = await lifecycle.start(slug)
+            if not ok:
+                await msg.respond(json.dumps({"ok": False, "error": reason}).encode())
+                return
+
+        active_calls[slug] = {"number": number, "status": "initiating"}
+        await msg.respond(json.dumps({"ok": True, "message": f"Call to {number} initiating for agent '{slug}'"}).encode())
+
+    async def handle_call_hangup(msg):
+        data = json.loads(msg.data)
+        slug = data.get("agent")
+        if slug in active_calls:
+            call_info = active_calls.pop(slug)
+            if "call_sid" in call_info:
+                from transports.twilio import hangup_call
+                await hangup_call(call_info["call_sid"])
+            await lifecycle.stop(slug)
+            await msg.respond(json.dumps({"ok": True, "message": "Call terminated"}).encode())
+        else:
+            await msg.respond(json.dumps({"ok": False, "error": "No active call"}).encode())
+
+    await nc.subscribe("hello.call.start", cb=handle_call_start)
+    await nc.subscribe("hello.call.hangup", cb=handle_call_hangup)
+
     # Duration limit checker (runs every 30s)
     async def check_limits():
         while not stop.is_set():
