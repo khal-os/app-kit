@@ -1,5 +1,5 @@
+import { useNats } from '@khal-os/sdk/app';
 import { useCallback, useState } from 'react';
-import { useNats } from '@/lib/hooks/use-nats';
 
 export function useAgentActions(onRefresh: () => void) {
 	const { request } = useNats();

@@ -1,7 +1,7 @@
 'use client';
 
+import { useNats } from '@khal-os/sdk/app';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNats } from '@/lib/hooks/use-nats';
 import type { EventEntry, FunctionCallEntry, MetricsState, TranscriptEntry, VadState } from '../types';
 
 interface AgentStreamState {

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Layout } from 'react-grid-layout';
 import RGL, { WidthProvider } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
-import { getNatsClient } from '@/lib/nats-client';
+import { getNatsClient } from '@khal-os/sdk/app';
 import { SUBJECTS } from '../../../lib/subjects';
 import { PaneCard } from './PaneCard';
 import { Sidebar } from './Sidebar';
