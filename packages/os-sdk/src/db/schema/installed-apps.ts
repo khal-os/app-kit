@@ -1,7 +1,13 @@
 import { jsonb, pgEnum, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 import { appStore } from './app-store';
 
-export const installedAppStatusEnum = pgEnum('installed_app_status', ['installed', 'running', 'stopped', 'error']);
+export const installedAppStatusEnum = pgEnum('installed_app_status', [
+	'installed',
+	'running',
+	'stopped',
+	'error',
+	'disabled',
+]);
 
 export const installedApps = pgTable('installed_apps', {
 	id: text('id')

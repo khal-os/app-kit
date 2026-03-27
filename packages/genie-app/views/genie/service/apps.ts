@@ -6,6 +6,8 @@
  *   os.genie.apps.get           — get single app by slug
  *   os.genie.apps.register      — register app (upsert store + install)
  *   os.genie.apps.unregister    — uninstall app (delete from installed_apps)
+ *   os.genie.apps.disable       — disable app (kill service, keep data)
+ *   os.genie.apps.enable        — re-enable a disabled app
  *   os.genie.apps.store.list    — list approved apps in the store
  *   os.genie.apps.store.submit  — submit app for review
  *   os.genie.apps.store.approve — approve a submitted app
@@ -26,6 +28,32 @@ function db() {
 		initDb({ schema, getDatabaseUrl });
 	}
 	return getDb();
+}
+
+/**
+ * Record an audit event for security-relevant app operations.
+ * Fire-and-forget — never throws (logs errors to console).
+ */
+async function audit(event: {
+	entityType: string;
+	entityId: string;
+	eventType: string;
+	actorId?: string;
+	orgId?: string;
+	details?: Record<string, unknown>;
+}): Promise<void> {
+	try {
+		await db().insert(schema.auditEvents).values({
+			entityType: event.entityType,
+			entityId: event.entityId,
+			eventType: event.eventType,
+			actorId: event.actorId,
+			orgId: event.orgId,
+			details: event.details,
+		});
+	} catch (err) {
+		console.error('[apps-service] audit log failed:', err);
+	}
 }
 
 /**
@@ -392,6 +420,13 @@ export const appsHandlers: ServiceHandler[] = [
 					});
 				}
 
+				await audit({
+					entityType: 'app',
+					entityId: req.slug,
+					eventType: 'app.installed',
+					details: { path: req.path, version: req.version, stackItems },
+				});
+
 				msg.respond(JSON.stringify({ ok: true, storeEntry, installed, stackItems }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
@@ -433,7 +468,87 @@ export const appsHandlers: ServiceHandler[] = [
 					.where(eq(schema.installedApps.slug, req.slug))
 					.returning();
 
+				await audit({
+					entityType: 'app',
+					entityId: req.slug,
+					eventType: 'app.uninstalled',
+					details: { removed: deleted.length, stackItemsRemoved },
+				});
+
 				msg.respond(JSON.stringify({ ok: true, removed: deleted.length, stackItemsRemoved }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Disable app (set status to 'disabled', keep data) ---
+	{
+		subject: SUBJECTS.apps.disable(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{ slug: string; reason?: string; actorId?: string }>();
+				if (!req.slug) {
+					msg.respond(JSON.stringify({ ok: false, error: 'slug is required' }));
+					return;
+				}
+
+				const [updated] = await db()
+					.update(schema.installedApps)
+					.set({ status: 'disabled' })
+					.where(eq(schema.installedApps.slug, req.slug))
+					.returning();
+
+				if (!updated) {
+					msg.respond(JSON.stringify({ ok: false, error: 'App not found' }));
+					return;
+				}
+
+				await audit({
+					entityType: 'app',
+					entityId: req.slug,
+					eventType: req.reason === 'circuit-breaker' ? 'app.auto-disabled' : 'app.disabled',
+					actorId: req.actorId ?? 'system',
+					details: { reason: req.reason ?? 'manual' },
+				});
+
+				msg.respond(JSON.stringify({ ok: true, app: updated }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Enable app (re-enable a disabled app) ---
+	{
+		subject: SUBJECTS.apps.enable(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{ slug: string; actorId?: string }>();
+				if (!req.slug) {
+					msg.respond(JSON.stringify({ ok: false, error: 'slug is required' }));
+					return;
+				}
+
+				const [updated] = await db()
+					.update(schema.installedApps)
+					.set({ status: 'installed' })
+					.where(eq(schema.installedApps.slug, req.slug))
+					.returning();
+
+				if (!updated) {
+					msg.respond(JSON.stringify({ ok: false, error: 'App not found' }));
+					return;
+				}
+
+				await audit({
+					entityType: 'app',
+					entityId: req.slug,
+					eventType: 'app.enabled',
+					actorId: req.actorId ?? 'system',
+				});
+
+				msg.respond(JSON.stringify({ ok: true, app: updated }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 			}
