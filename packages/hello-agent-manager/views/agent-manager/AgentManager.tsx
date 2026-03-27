@@ -1,23 +1,53 @@
 'use client';
 
 import { Mic, Plus } from 'lucide-react';
+import { useCallback, useState } from 'react';
 import { EmptyState, StatusBar } from '@/components/os-primitives';
 import { Button } from '@/components/ui/button';
 import { Note } from '@/components/ui/note';
 import { Spinner } from '@/components/ui/spinner';
 import { useNats } from '@/lib/hooks/use-nats';
 import { AgentCard } from './AgentCard';
+import { AgentFormDialog } from './AgentFormDialog';
 import { useAgents } from './hooks/useAgents';
+import type { AgentConfig } from './types';
 
 export function AgentManager(_props: { windowId: string; meta?: Record<string, unknown> }) {
-	const { connected } = useNats();
+	const { connected, request } = useNats();
 	const { agents, loading, error, refresh } = useAgents();
+	const [dialogOpen, setDialogOpen] = useState(false);
+	const [editingAgent, setEditingAgent] = useState<AgentConfig | undefined>();
+
+	const openCreate = useCallback(() => {
+		setEditingAgent(undefined);
+		setDialogOpen(true);
+	}, []);
+
+	const openEdit = useCallback((agent: AgentConfig) => {
+		setEditingAgent(agent);
+		setDialogOpen(true);
+	}, []);
+
+	const closeDialog = useCallback(() => {
+		setDialogOpen(false);
+		setEditingAgent(undefined);
+	}, []);
+
+	const handleSave = useCallback(
+		async (data: Partial<AgentConfig>) => {
+			const subject = data.id ? 'hello.agent.update' : 'hello.agent.create';
+			await request(subject, data);
+			closeDialog();
+			refresh();
+		},
+		[request, closeDialog, refresh]
+	);
 
 	return (
 		<div className="flex h-full flex-col bg-background-100">
 			<div className="flex items-center justify-between border-b border-border px-4 py-2">
 				<h1 className="text-sm font-medium text-foreground">Agent Manager</h1>
-				<Button size="small" prefix={<Plus className="h-3.5 w-3.5" />}>
+				<Button size="small" prefix={<Plus className="h-3.5 w-3.5" />} onClick={openCreate}>
 					Create Agent
 				</Button>
 			</div>
@@ -41,7 +71,7 @@ export function AgentManager(_props: { windowId: string; meta?: Record<string, u
 						title="No agents configured"
 						description="Create your first HELLO voice agent to get started."
 						action={
-							<Button size="small" prefix={<Plus className="h-3.5 w-3.5" />}>
+							<Button size="small" prefix={<Plus className="h-3.5 w-3.5" />} onClick={openCreate}>
 								Create Agent
 							</Button>
 						}
@@ -51,7 +81,7 @@ export function AgentManager(_props: { windowId: string; meta?: Record<string, u
 				{!loading && !error && agents.length > 0 && (
 					<div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 lg:grid-cols-3">
 						{agents.map((agent) => (
-							<AgentCard key={agent.id} agent={agent} />
+							<AgentCard key={agent.id} agent={agent} onEdit={openEdit} />
 						))}
 					</div>
 				)}
@@ -73,6 +103,8 @@ export function AgentManager(_props: { windowId: string; meta?: Record<string, u
 				<StatusBar.Spacer />
 				<StatusBar.Item onClick={refresh}>Refresh</StatusBar.Item>
 			</StatusBar>
+
+			<AgentFormDialog open={dialogOpen} agent={editingAgent} onSave={handleSave} onClose={closeDialog} />
 		</div>
 	);
 }
