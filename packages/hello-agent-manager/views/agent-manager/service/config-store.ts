@@ -1,8 +1,8 @@
-import type { ServiceHandler } from "@khal-os/sdk/service";
-import { getDatabaseUrl } from "@khal-os/sdk/config";
-import { getDb, initDb, isDbInitialized } from "@khal-os/sdk/db";
-import { eq, sql } from "@khal-os/sdk/db/operators";
-import * as schema from "@khal-os/sdk/db/schema";
+import { getDatabaseUrl } from '@khal-os/sdk/config';
+import { getDb, initDb, isDbInitialized } from '@khal-os/sdk/db';
+import { eq, sql } from '@khal-os/sdk/db/operators';
+import * as schema from '@khal-os/sdk/db/schema';
+import type { ServiceHandler } from '@khal-os/sdk/service';
 
 function db() {
 	if (!isDbInitialized()) {
@@ -13,7 +13,7 @@ function db() {
 
 export const configStoreHandlers: ServiceHandler[] = [
 	{
-		subject: "os.config.set",
+		subject: 'os.config.set',
 		handler: async (msg) => {
 			try {
 				const req = msg.json<{ key: string; value: string }>();
@@ -31,32 +31,23 @@ export const configStoreHandlers: ServiceHandler[] = [
 		},
 	},
 	{
-		subject: "os.config.get",
+		subject: 'os.config.get',
 		handler: async (msg) => {
 			try {
 				const req = msg.json<{ key: string }>();
-				const [entry] = await db()
-					.select()
-					.from(schema.osConfig)
-					.where(eq(schema.osConfig.key, req.key));
-				msg.respond(
-					JSON.stringify(
-						entry
-							? { key: entry.key, value: entry.value }
-							: { key: req.key, value: null },
-					),
-				);
+				const [entry] = await db().select().from(schema.osConfig).where(eq(schema.osConfig.key, req.key));
+				msg.respond(JSON.stringify(entry ? { key: entry.key, value: entry.value } : { key: req.key, value: null }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err) }));
 			}
 		},
 	},
 	{
-		subject: "os.config.list",
+		subject: 'os.config.list',
 		handler: async (msg) => {
 			try {
 				const req = msg.json<{ prefix?: string }>();
-				const prefix = req.prefix || "";
+				const prefix = req.prefix || '';
 				const rows = await db()
 					.select()
 					.from(schema.osConfig)
@@ -64,7 +55,7 @@ export const configStoreHandlers: ServiceHandler[] = [
 				msg.respond(
 					JSON.stringify({
 						items: rows.map((r) => ({ key: r.key, value: r.value })),
-					}),
+					})
 				);
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err) }));
@@ -72,13 +63,11 @@ export const configStoreHandlers: ServiceHandler[] = [
 		},
 	},
 	{
-		subject: "os.config.delete",
+		subject: 'os.config.delete',
 		handler: async (msg) => {
 			try {
 				const req = msg.json<{ key: string }>();
-				await db()
-					.delete(schema.osConfig)
-					.where(eq(schema.osConfig.key, req.key));
+				await db().delete(schema.osConfig).where(eq(schema.osConfig.key, req.key));
 				msg.respond(JSON.stringify({ ok: true }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err) }));

@@ -1,14 +1,9 @@
-import type { NatsConnection, ServiceHandler } from "@khal-os/sdk/service";
+import type { NatsConnection, ServiceHandler } from '@khal-os/sdk/service';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-async function forwardRequest(
-	nc: NatsConnection,
-	subject: string,
-	data: unknown,
-	timeoutMs = 5000,
-): Promise<unknown> {
+async function forwardRequest(nc: NatsConnection, subject: string, data: unknown, timeoutMs = 5000): Promise<unknown> {
 	const payload = encoder.encode(JSON.stringify(data));
 	const response = await nc.request(subject, payload, {
 		timeout: timeoutMs,
@@ -18,10 +13,10 @@ async function forwardRequest(
 
 export const agentProxyHandlers: ServiceHandler[] = [
 	{
-		subject: "os.hello.agents.list",
+		subject: 'os.hello.agents.list',
 		handler: async (msg, nc) => {
 			try {
-				const result = await forwardRequest(nc, "hello.agent.list", {});
+				const result = await forwardRequest(nc, 'hello.agent.list', {});
 				msg.respond(JSON.stringify(result));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err), agents: [] }));
@@ -29,15 +24,11 @@ export const agentProxyHandlers: ServiceHandler[] = [
 		},
 	},
 	{
-		subject: "os.hello.agents.get",
+		subject: 'os.hello.agents.get',
 		handler: async (msg, nc) => {
 			try {
 				const req = msg.json<{ slug: string }>();
-				const result = await forwardRequest(
-					nc,
-					"hello.agent.config",
-					{ slug: req.slug },
-				);
+				const result = await forwardRequest(nc, 'hello.agent.config', { slug: req.slug });
 				msg.respond(JSON.stringify(result));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err) }));
@@ -45,21 +36,15 @@ export const agentProxyHandlers: ServiceHandler[] = [
 		},
 	},
 	{
-		subject: "os.hello.agents.create",
+		subject: 'os.hello.agents.create',
 		handler: async (msg, nc) => {
 			try {
 				const req = msg.json<Record<string, unknown>>();
 				if (!req.name || !req.slug) {
-					msg.respond(
-						JSON.stringify({ error: "name and slug are required" }),
-					);
+					msg.respond(JSON.stringify({ error: 'name and slug are required' }));
 					return;
 				}
-				const result = await forwardRequest(
-					nc,
-					"hello.agent.create",
-					req,
-				);
+				const result = await forwardRequest(nc, 'hello.agent.create', req);
 				msg.respond(JSON.stringify(result));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err) }));
@@ -67,15 +52,11 @@ export const agentProxyHandlers: ServiceHandler[] = [
 		},
 	},
 	{
-		subject: "os.hello.agents.update",
+		subject: 'os.hello.agents.update',
 		handler: async (msg, nc) => {
 			try {
 				const req = msg.json<Record<string, unknown>>();
-				const result = await forwardRequest(
-					nc,
-					"hello.agent.create",
-					req,
-				);
+				const result = await forwardRequest(nc, 'hello.agent.create', req);
 				msg.respond(JSON.stringify(result));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err) }));
@@ -83,15 +64,11 @@ export const agentProxyHandlers: ServiceHandler[] = [
 		},
 	},
 	{
-		subject: "os.hello.agents.delete",
+		subject: 'os.hello.agents.delete',
 		handler: async (msg, nc) => {
 			try {
 				const req = msg.json<{ slug: string }>();
-				const result = await forwardRequest(
-					nc,
-					"hello.agent.delete",
-					{ slug: req.slug },
-				);
+				const result = await forwardRequest(nc, 'hello.agent.delete', { slug: req.slug });
 				msg.respond(JSON.stringify(result));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err) }));
@@ -99,15 +76,11 @@ export const agentProxyHandlers: ServiceHandler[] = [
 		},
 	},
 	{
-		subject: "os.hello.agents.start",
+		subject: 'os.hello.agents.start',
 		handler: async (msg, nc) => {
 			try {
 				const req = msg.json<{ slug: string }>();
-				const result = await forwardRequest(
-					nc,
-					"hello.agent.start",
-					{ slug: req.slug },
-				);
+				const result = await forwardRequest(nc, 'hello.agent.start', { slug: req.slug });
 				msg.respond(JSON.stringify(result));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err) }));
@@ -115,11 +88,11 @@ export const agentProxyHandlers: ServiceHandler[] = [
 		},
 	},
 	{
-		subject: "os.hello.agents.stop",
+		subject: 'os.hello.agents.stop',
 		handler: async (msg, nc) => {
 			try {
 				const req = msg.json<{ slug: string }>();
-				const result = await forwardRequest(nc, "hello.agent.stop", {
+				const result = await forwardRequest(nc, 'hello.agent.stop', {
 					slug: req.slug,
 				});
 				msg.respond(JSON.stringify(result));
@@ -129,20 +102,14 @@ export const agentProxyHandlers: ServiceHandler[] = [
 		},
 	},
 	{
-		subject: "os.hello.agents.metrics",
+		subject: 'os.hello.agents.metrics',
 		handler: async (msg, nc) => {
 			try {
 				const req = msg.json<{ slug?: string }>();
-				const result = await forwardRequest(
-					nc,
-					"hello.agent.metrics",
-					req,
-				);
+				const result = await forwardRequest(nc, 'hello.agent.metrics', req);
 				msg.respond(JSON.stringify(result));
 			} catch (err) {
-				msg.respond(
-					JSON.stringify({ error: String(err), metrics: [] }),
-				);
+				msg.respond(JSON.stringify({ error: String(err), metrics: [] }));
 			}
 		},
 	},

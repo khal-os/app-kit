@@ -1,5 +1,5 @@
-import { useCallback, useState } from "react";
-import { useNats } from "@/lib/hooks/use-nats";
+import { useCallback, useState } from 'react';
+import { useNats } from '@/lib/hooks/use-nats';
 
 export function useAgentActions(onRefresh: () => void) {
 	const { request } = useNats();
@@ -9,39 +9,39 @@ export function useAgentActions(onRefresh: () => void) {
 		async (slug: string) => {
 			setPending(slug);
 			try {
-				await request("os.hello.agents.start", { slug });
+				await request('os.hello.agents.start', { slug });
 				onRefresh();
 			} finally {
 				setPending(null);
 			}
 		},
-		[request, onRefresh],
+		[request, onRefresh]
 	);
 
 	const stopAgent = useCallback(
 		async (slug: string) => {
 			setPending(slug);
 			try {
-				await request("os.hello.agents.stop", { slug });
+				await request('os.hello.agents.stop', { slug });
 				onRefresh();
 			} finally {
 				setPending(null);
 			}
 		},
-		[request, onRefresh],
+		[request, onRefresh]
 	);
 
 	const deleteAgent = useCallback(
 		async (slug: string) => {
 			setPending(slug);
 			try {
-				await request("os.hello.agents.delete", { slug });
+				await request('os.hello.agents.delete', { slug });
 				onRefresh();
 			} finally {
 				setPending(null);
 			}
 		},
-		[request, onRefresh],
+		[request, onRefresh]
 	);
 
 	return { startAgent, stopAgent, deleteAgent, pending };

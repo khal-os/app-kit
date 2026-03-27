@@ -1,12 +1,12 @@
-"use client";
-import { Button } from "@/components/ui/button";
+'use client';
+import { Button } from '@/components/ui/button';
 
 interface ConfirmDialogProps {
 	open: boolean;
 	title: string;
 	description: string;
 	confirmLabel?: string;
-	confirmVariant?: "default" | "error";
+	confirmVariant?: 'default' | 'error';
 	onConfirm: () => void;
 	onCancel: () => void;
 	loading?: boolean;
@@ -16,8 +16,8 @@ export function ConfirmDialog({
 	open,
 	title,
 	description,
-	confirmLabel = "Confirm",
-	confirmVariant = "default",
+	confirmLabel = 'Confirm',
+	confirmVariant = 'default',
 	onConfirm,
 	onCancel,
 	loading,
@@ -29,20 +29,10 @@ export function ConfirmDialog({
 				<h3 className="font-medium text-foreground">{title}</h3>
 				<p className="mt-1 text-sm text-muted">{description}</p>
 				<div className="mt-4 flex justify-end gap-2">
-					<Button
-						size="small"
-						variant="ghost"
-						onClick={onCancel}
-						disabled={loading}
-					>
+					<Button size="small" variant="ghost" onClick={onCancel} disabled={loading}>
 						Cancel
 					</Button>
-					<Button
-						size="small"
-						variant={confirmVariant}
-						onClick={onConfirm}
-						loading={loading}
-					>
+					<Button size="small" variant={confirmVariant} onClick={onConfirm} loading={loading}>
 						{confirmLabel}
 					</Button>
 				</div>
