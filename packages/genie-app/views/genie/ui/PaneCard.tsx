@@ -1,7 +1,7 @@
 'use client';
 
+import { getNatsClient } from '@khal-os/sdk/app';
 import { useCallback, useState } from 'react';
-import { getNatsClient } from '@/lib/nats-client';
 import { SUBJECTS } from '../../../lib/subjects';
 import { XTermPane } from './XTermPane';
 

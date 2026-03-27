@@ -1,11 +1,11 @@
 'use client';
 
-import { Button, Input, Spinner } from '@khal-os/ui';
+import { SUBJECTS, useKhalAuth, useNats } from '@khal-os/sdk/app';
 import { Inbox } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
-import { useKhalAuth } from '@/lib/auth/use-auth';
-import { useNats } from '@/lib/hooks/use-nats';
-import { SUBJECTS } from '@/lib/subjects';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 import type { LogEntry } from './types';
 
 function buildQuickPickSubjects(orgId: string): string[] {

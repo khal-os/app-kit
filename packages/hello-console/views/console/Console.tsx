@@ -1,9 +1,10 @@
 'use client';
 
-import { EmptyState, Note, SplitPane, StatusBar, Toolbar } from '@khal-os/ui';
+import { useNats } from '@khal-os/sdk/app';
 import { Headphones, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { useNats } from '@/lib/hooks/use-nats';
+import { EmptyState, SplitPane, StatusBar, Toolbar } from '@/components/os-primitives';
+import { Note } from '@/components/ui/note';
 import { AgentSelector } from './AgentSelector';
 import { EventsPanel } from './EventsPanel';
 import { useAgentList } from './hooks/useAgentList';

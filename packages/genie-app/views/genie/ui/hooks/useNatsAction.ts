@@ -1,7 +1,7 @@
 'use client';
 
+import { getNatsClient } from '@khal-os/sdk/app';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getNatsClient } from '@/lib/nats-client';
 
 interface UseNatsActionResult<T> {
 	execute: (payload?: unknown) => Promise<T>;

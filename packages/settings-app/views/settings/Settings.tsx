@@ -1,25 +1,17 @@
 'use client';
 
-import {
-	Button,
-	EmptyState,
-	Input,
-	Note,
-	PropertyPanel,
-	SectionHeader,
-	Separator,
-	SidebarNav,
-	SplitPane,
-	StatusBar,
-	ThemeSwitcher,
-	Toggle,
-} from '@khal-os/ui';
+import { SUBJECTS, useNats } from '@khal-os/sdk/app';
 import { Bell, Command, Info, Monitor, Radio } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useNats } from '@/lib/hooks/use-nats';
+import { EmptyState, PropertyPanel, SectionHeader, SidebarNav, SplitPane, StatusBar } from '@/components/os-primitives';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Note } from '@/components/ui/note';
+import { Separator } from '@/components/ui/separator';
+import { Toggle } from '@/components/ui/switch';
+import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 import type { KeyCombo, ModifierKey, ShortcutCategory } from '@/lib/keyboard/types';
 import { comboToSymbols } from '@/lib/keyboard/types';
-import { SUBJECTS } from '@/lib/subjects';
 import { useKeybindStore } from '@/stores/keybind-store';
 import type { DesktopNotifMode } from '@/stores/notification-store';
 import { useNotificationStore } from '@/stores/notification-store';

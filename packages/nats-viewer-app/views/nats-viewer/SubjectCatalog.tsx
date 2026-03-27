@@ -1,9 +1,7 @@
 'use client';
 
+import { SUBJECTS, useKhalAuth, useNats } from '@khal-os/sdk/app';
 import { useMemo } from 'react';
-import { useKhalAuth } from '@/lib/auth/use-auth';
-import { useNats } from '@/lib/hooks/use-nats';
-import { SUBJECTS } from '@/lib/subjects';
 import { useNatsViewer } from './nats-viewer-context';
 
 /**

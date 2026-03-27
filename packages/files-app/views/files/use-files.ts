@@ -1,8 +1,7 @@
 'use client';
 
+import { SUBJECTS, useNats } from '@khal-os/sdk/app';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNats } from '@/lib/hooks/use-nats';
-import { SUBJECTS } from '@/lib/subjects';
 import type { FileEntry, FileListResponse, FileWriteRequest, FileWriteResponse } from './schema';
 
 /**
