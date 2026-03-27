@@ -1,0 +1,14 @@
+{
+	"name": "@khal-os/hello-agent-manager",
+	"version": "0.1.0",
+	"private": true,
+	"main": "./manifest.ts",
+	"exports": {
+		".": "./manifest.ts",
+		"./components": "./components.ts",
+		"./views/*": "./views/*"
+	},
+	"peerDependencies": {
+		"react": ">=19"
+	}
+}
