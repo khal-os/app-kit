@@ -8,6 +8,15 @@
 		"./components": "./components.ts",
 		"./views/*": "./views/*"
 	},
+	"genieOs": {
+		"services": [
+			{
+				"name": "hello-agent-manager",
+				"entry": "./views/agent-manager/service/index.ts",
+				"runtime": "node"
+			}
+		]
+	},
 	"peerDependencies": {
 		"react": ">=19"
 	}
