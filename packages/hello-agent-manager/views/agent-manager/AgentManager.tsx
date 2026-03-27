@@ -1,7 +1,7 @@
 'use client';
 
 import { Mic, Plus } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { EmptyState, StatusBar } from '@/components/os-primitives';
 import { Button } from '@/components/ui/button';
 import { Note } from '@/components/ui/note';
@@ -9,14 +9,26 @@ import { Spinner } from '@/components/ui/spinner';
 import { useNats } from '@/lib/hooks/use-nats';
 import { AgentCard } from './AgentCard';
 import { AgentFormDialog } from './AgentFormDialog';
+import { ConfirmDialog } from './ConfirmDialog';
+import { useAgentActions } from './hooks/useAgentActions';
 import { useAgents } from './hooks/useAgents';
 import type { AgentConfig } from './types';
 
 export function AgentManager(_props: { windowId: string; meta?: Record<string, unknown> }) {
 	const { connected, request } = useNats();
 	const { agents, loading, error, refresh } = useAgents();
+	const { startAgent, stopAgent, deleteAgent, pending } = useAgentActions(refresh);
 	const [dialogOpen, setDialogOpen] = useState(false);
 	const [editingAgent, setEditingAgent] = useState<AgentConfig | undefined>();
+	const [deletingAgent, setDeletingAgent] = useState<AgentConfig | null>(null);
+	const prevConnected = useRef(connected);
+
+	useEffect(() => {
+		if (connected && !prevConnected.current) {
+			refresh();
+		}
+		prevConnected.current = connected;
+	}, [connected, refresh]);
 
 	const openCreate = useCallback(() => {
 		setEditingAgent(undefined);
@@ -43,6 +55,12 @@ export function AgentManager(_props: { windowId: string; meta?: Record<string, u
 		[request, closeDialog, refresh]
 	);
 
+	const handleDelete = useCallback(async () => {
+		if (!deletingAgent) return;
+		await deleteAgent(deletingAgent.slug);
+		setDeletingAgent(null);
+	}, [deletingAgent, deleteAgent]);
+
 	return (
 		<div className="flex h-full flex-col bg-background-100">
 			<div className="flex items-center justify-between border-b border-border px-4 py-2">
@@ -61,7 +79,16 @@ export function AgentManager(_props: { windowId: string; meta?: Record<string, u
 
 				{!loading && error && (
 					<div className="p-4">
-						<Note type="error">{error}</Note>
+						<Note
+							type="error"
+							action={
+								<Button size="small" variant="ghost" onClick={refresh}>
+									Retry
+								</Button>
+							}
+						>
+							{error}
+						</Note>
 					</div>
 				)}
 
@@ -81,7 +108,15 @@ export function AgentManager(_props: { windowId: string; meta?: Record<string, u
 				{!loading && !error && agents.length > 0 && (
 					<div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 lg:grid-cols-3">
 						{agents.map((agent) => (
-							<AgentCard key={agent.id} agent={agent} onEdit={openEdit} />
+							<AgentCard
+								key={agent.id}
+								agent={agent}
+								loading={pending === agent.slug}
+								onStart={(a) => startAgent(a.slug)}
+								onStop={(a) => stopAgent(a.slug)}
+								onEdit={openEdit}
+								onDelete={(a) => setDeletingAgent(a)}
+							/>
 						))}
 					</div>
 				)}
@@ -105,6 +140,17 @@ export function AgentManager(_props: { windowId: string; meta?: Record<string, u
 			</StatusBar>
 
 			<AgentFormDialog open={dialogOpen} agent={editingAgent} onSave={handleSave} onClose={closeDialog} />
+
+			<ConfirmDialog
+				open={!!deletingAgent}
+				title="Delete Agent"
+				description={`Are you sure you want to delete "${deletingAgent?.name}"? This cannot be undone.`}
+				confirmLabel="Delete"
+				confirmVariant="error"
+				onConfirm={handleDelete}
+				onCancel={() => setDeletingAgent(null)}
+				loading={!!pending}
+			/>
 		</div>
 	);
 }

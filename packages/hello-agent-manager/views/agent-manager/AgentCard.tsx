@@ -4,6 +4,7 @@ import { Globe, Mic, Pencil, Play, Square, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/ui/glass-card';
+import { CostBar } from './CostBar';
 import type { AgentConfig } from './types';
 
 const statusConfig = {
@@ -14,14 +15,17 @@ const statusConfig = {
 
 interface AgentCardProps {
 	agent: AgentConfig;
+	metrics?: { cost_today_usd: number };
+	loading?: boolean;
 	onEdit?: (agent: AgentConfig) => void;
 	onStart?: (agent: AgentConfig) => void;
 	onStop?: (agent: AgentConfig) => void;
 	onDelete?: (agent: AgentConfig) => void;
 }
 
-export function AgentCard({ agent, onEdit, onStart, onStop, onDelete }: AgentCardProps) {
+export function AgentCard({ agent, metrics, loading, onEdit, onStart, onStop, onDelete }: AgentCardProps) {
 	const { label, variant } = statusConfig[agent.status];
+	const disabled = !!loading;
 
 	return (
 		<GlassCard hover padding="md">
@@ -47,7 +51,7 @@ export function AgentCard({ agent, onEdit, onStart, onStop, onDelete }: AgentCar
 					</span>
 				</div>
 
-				<div className="text-xs text-muted">Budget: ${agent.daily_budget_usd.toFixed(2)}/day</div>
+				<CostBar spent={metrics?.cost_today_usd ?? 0} budget={agent.daily_budget_usd} />
 
 				<div className="flex items-center gap-1 border-t border-border pt-2">
 					{agent.status === 'running' ? (
@@ -56,6 +60,8 @@ export function AgentCard({ agent, onEdit, onStart, onStop, onDelete }: AgentCar
 							variant="ghost"
 							prefix={<Square className="h-3.5 w-3.5" />}
 							onClick={() => onStop?.(agent)}
+							disabled={disabled}
+							loading={loading}
 						>
 							Stop
 						</Button>
@@ -65,6 +71,8 @@ export function AgentCard({ agent, onEdit, onStart, onStop, onDelete }: AgentCar
 							variant="ghost"
 							prefix={<Play className="h-3.5 w-3.5" />}
 							onClick={() => onStart?.(agent)}
+							disabled={disabled}
+							loading={loading}
 						>
 							Start
 						</Button>
@@ -74,6 +82,7 @@ export function AgentCard({ agent, onEdit, onStart, onStop, onDelete }: AgentCar
 						variant="ghost"
 						prefix={<Pencil className="h-3.5 w-3.5" />}
 						onClick={() => onEdit?.(agent)}
+						disabled={disabled}
 					>
 						Edit
 					</Button>
@@ -83,6 +92,7 @@ export function AgentCard({ agent, onEdit, onStart, onStop, onDelete }: AgentCar
 						variant="ghost"
 						prefix={<Trash2 className="h-3.5 w-3.5 text-error" />}
 						onClick={() => onDelete?.(agent)}
+						disabled={disabled}
 					/>
 				</div>
 			</div>
