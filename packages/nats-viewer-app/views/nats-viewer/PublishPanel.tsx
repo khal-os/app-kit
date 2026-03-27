@@ -3,8 +3,7 @@
 import { SUBJECTS, useKhalAuth, useNats } from '@khal-os/sdk/app';
 import { Send } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button, Input } from '@khal-os/ui';
 import type { LogEntry } from './types';
 
 function buildQuickPickSubjects(orgId: string): string[] {
