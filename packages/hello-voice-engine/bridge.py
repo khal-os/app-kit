@@ -87,6 +87,9 @@ async def main():
     await nc.subscribe("hello.agent.delete", cb=handle_agent_delete)
     await nc.subscribe("hello.agent.config", cb=handle_agent_config)
 
+    # Flow management (will be wired when agent pipeline runs)
+    flow_managers: dict[str, object] = {}  # agent_slug -> HelloFlowManager
+
     # Track active calls
     active_calls: dict[str, dict] = {}
 
