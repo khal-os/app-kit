@@ -88,4 +88,6 @@ Phone   ↔ Twilio ↔ Voice Engine ↔ NATS ↔ CLI
 | `TWILIO_ACCOUNT_SID` | For calls | Twilio Account SID |
 | `TWILIO_AUTH_TOKEN` | For calls | Twilio Auth Token |
 | `TWILIO_PHONE_NUMBER` | For calls | Twilio phone number (E.164) |
+| `HELLO_WS_PUBLIC_URL` | For calls | Public WebSocket URL for Twilio callbacks (e.g., `wss://example.ngrok.io`) |
+| `HELLO_VOICE_PORT` | No | FastAPI server port (default: 7860) |
 | `NATS_URL` | No | NATS server URL (default: localhost:4222) |

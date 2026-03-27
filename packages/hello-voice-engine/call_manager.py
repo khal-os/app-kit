@@ -71,18 +71,23 @@ class CallManager:
                 "dry_run": True,
             }
 
+        # Check for existing active call on this agent (prevent race condition)
+        if self.get_active_for_agent(agent_slug):
+            return {"ok": False, "error": f"Agent '{agent_slug}' already has an active call"}
+
         call_id = str(uuid.uuid4())[:8]
         call = ActiveCall(
             call_id=call_id,
             agent_slug=agent_slug,
             phone_number=phone_number,
+            started_at=time.time(),
         )
+        # Reserve the slot before making the Twilio API call
+        self._pending_calls[call_id] = call
 
         try:
             call_sid = self._twilio.make_outbound_call(phone_number, call_id)
             call.call_sid = call_sid
-            call.started_at = time.time()
-            self._pending_calls[call_id] = call
 
             await self._nc.publish(
                 event_subject(agent_slug, CALL_STATE),
@@ -96,6 +101,7 @@ class CallManager:
                 "message": f"Calling {phone_number}...",
             }
         except Exception as e:
+            self._pending_calls.pop(call_id, None)
             return {"ok": False, "error": f"Twilio error: {e}"}
 
     def activate_call(self, call_id: str, pipeline_task: asyncio.Task):
@@ -205,6 +211,29 @@ class CallManager:
             }
             for c in self._active_calls.values()
         ]
+
+    async def cleanup_stale(self, timeout_sec: float = 600):
+        """Terminate calls that have been active longer than timeout (default 10min).
+
+        Should be called periodically from bridge.py's event loop.
+        """
+        now = time.time()
+        stale = [
+            c for c in self._active_calls.values()
+            if c.started_at and (now - c.started_at) > timeout_sec
+        ]
+        for call in stale:
+            print(f"[hello-voice] stale session: call={call.call_id} agent={call.agent_slug} — auto-terminating")
+            await self.hangup(call_id=call.call_id)
+
+        # Also clean up pending calls that never connected (30s timeout)
+        stale_pending = [
+            c for c in self._pending_calls.values()
+            if c.started_at and (now - c.started_at) > 30
+        ]
+        for call in stale_pending:
+            print(f"[hello-voice] pending call never connected: {call.call_id} — cleaning up")
+            self._pending_calls.pop(call.call_id, None)
 
     def _resolve_call(
         self,

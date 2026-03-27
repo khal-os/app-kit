@@ -88,17 +88,17 @@ async def main():
 
     nc = NATS()
     nats_url = os.environ.get("NATS_URL", "nats://localhost:4222")
-    await nc.connect(nats_url)
+    await nc.connect(nats_url, connect_timeout=10)
     print("[hello-voice] HELLO voice engine ready")
 
     # Validate environment
     missing = []
-    for var in ["GEMINI_API_KEY"]:
+    for var in ["GEMINI_API_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER", "HELLO_WS_PUBLIC_URL"]:
         if not os.environ.get(var):
             missing.append(var)
     if missing:
         print(f"[hello-voice] WARNING: Missing env vars: {', '.join(missing)}")
-        print("[hello-voice] Voice calls will fail. Set these in .env or environment.")
+        print("[hello-voice] Voice calls will fail until these are set. See .env.example.")
 
     if "--test-nats" in sys.argv:
         await publish_test_events(nc)
@@ -251,6 +251,14 @@ async def main():
             await asyncio.sleep(30)
 
     asyncio.create_task(check_limits())
+
+    # Stale session cleanup — terminate calls inactive for 10 minutes
+    async def cleanup_stale():
+        while not stop.is_set():
+            await call_mgr.cleanup_stale(timeout_sec=600)
+            await asyncio.sleep(60)
+
+    asyncio.create_task(cleanup_stale())
 
     # Start FastAPI server for Twilio WebSocket callbacks
     port = int(os.environ.get("HELLO_VOICE_PORT", "7860"))

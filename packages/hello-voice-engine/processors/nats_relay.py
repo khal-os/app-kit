@@ -35,7 +35,11 @@ class NatsRelay(FrameProcessor):
         sub = await self._nc.subscribe(cmd_subject(self._agent_id, ">"))
         async for msg in sub.messages:
             subject = msg.subject
-            data = json.loads(msg.data) if msg.data else {}
+            try:
+                data = json.loads(msg.data) if msg.data else {}
+            except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                print(f"[hello-voice] malformed command on {subject}: {e}")
+                continue
 
             if subject.endswith(f".{INJECT_CONTEXT}"):
                 from pipecat.frames.frames import LLMMessagesAppendFrame
