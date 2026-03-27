@@ -1,0 +1,14 @@
+{
+  "name": "@khal-os/hello-voice-engine",
+  "version": "0.1.0",
+  "private": true,
+  "genieOs": {
+    "services": [
+      {
+        "name": "hello-voice",
+        "entry": "bridge.py",
+        "runtime": "python"
+      }
+    ]
+  }
+}
