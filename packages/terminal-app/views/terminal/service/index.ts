@@ -1,11 +1,3 @@
-// Bail out early if node-pty is not available (e.g. binary mode without native addon)
-try {
-	require.resolve('node-pty');
-} catch {
-	console.warn('[terminal] node-pty not available — terminal service disabled');
-	process.exit(0); // Graceful exit — service-loader won't retry
-}
-
 import type { NatsConnection } from '@khal-os/sdk/service';
 import { createService } from '@khal-os/sdk/service';
 import type {
