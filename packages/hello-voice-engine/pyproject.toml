@@ -1,0 +1,16 @@
+[project]
+name = "hello-voice-engine"
+version = "0.1.0"
+description = "HELLO Voice Engine — Pipecat-powered voice pipeline for KhalOS"
+requires-python = ">=3.11"
+dependencies = [
+    "pipecat-ai[gemini-live,twilio,silero,flows,runner,webrtc]",
+    "nats-py",
+    "python-dotenv",
+    "fastapi",
+    "uvicorn",
+    "twilio",
+]
+
+[project.scripts]
+hello-voice = "hello_voice_engine.bridge:main"
