@@ -14,7 +14,7 @@ export function useAgents() {
 		setLoading(true);
 		setError(null);
 		try {
-			const res = (await request('hello.agent.list', {})) as {
+			const res = (await request('os.hello.agents.list', {})) as {
 				agents?: AgentConfig[];
 				error?: string;
 			};
@@ -42,10 +42,10 @@ export function useAgents() {
 
 	useEffect(() => {
 		if (!connected) return;
-		const unsub = subscribe('hello.*.event.call_state', (data: unknown) => {
-			const msg = data as { slug?: string; status?: AgentConfig['status'] };
-			if (!msg.slug || !msg.status) return;
-			setAgents((prev) => prev.map((a) => (a.slug === msg.slug ? { ...a, status: msg.status! } : a)));
+		const unsub = subscribe('hello.*.event.call_state', (msg: unknown) => {
+			const data = msg as { slug?: string; status?: AgentConfig['status'] };
+			if (!data.slug || !data.status) return;
+			setAgents((prev) => prev.map((a) => (a.slug === data.slug ? { ...a, status: data.status! } : a)));
 		});
 		return unsub;
 	}, [connected, subscribe]);

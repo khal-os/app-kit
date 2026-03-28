@@ -56,7 +56,7 @@ export const agentProxyHandlers: ServiceHandler[] = [
 		handler: async (msg, nc) => {
 			try {
 				const req = msg.json<Record<string, unknown>>();
-				const result = await forwardRequest(nc, 'hello.agent.create', req);
+				const result = await forwardRequest(nc, 'hello.agent.update', req);
 				msg.respond(JSON.stringify(result));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err) }));

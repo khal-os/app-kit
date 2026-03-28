@@ -47,7 +47,7 @@ export function AgentManager(_props: { windowId: string; meta?: Record<string, u
 
 	const handleSave = useCallback(
 		async (data: Partial<AgentConfig>) => {
-			const subject = data.id ? 'hello.agent.update' : 'hello.agent.create';
+			const subject = data.id ? 'os.hello.agents.update' : 'os.hello.agents.create';
 			await request(subject, data);
 			closeDialog();
 			refresh();
