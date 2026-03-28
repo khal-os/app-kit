@@ -114,6 +114,7 @@ export const SUBJECTS = {
 			list: () => `${PREFIX}.apps.store.list`,
 			submit: () => `${PREFIX}.apps.store.submit`,
 			approve: () => `${PREFIX}.apps.store.approve`,
+			reject: () => `${PREFIX}.apps.store.reject`,
 		},
 		run: {
 			start: () => `${PREFIX}.apps.run.start`,

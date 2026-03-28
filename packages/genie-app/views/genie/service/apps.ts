@@ -358,6 +358,12 @@ export const appsHandlers: ServiceHandler[] = [
 					})
 					.returning();
 
+				// Increment download_count for store installs
+				await db()
+					.update(schema.appStore)
+					.set({ downloadCount: sql`COALESCE(${schema.appStore.downloadCount}, 0) + 1` })
+					.where(eq(schema.appStore.id, storeEntry.id));
+
 				// Upsert into installed_apps (slug is unique)
 				const [installed] = await db()
 					.insert(schema.installedApps)
@@ -650,6 +656,44 @@ export const appsHandlers: ServiceHandler[] = [
 						approvalStatus: 'approved',
 						approvedBy: req.approvedBy,
 						approvedAt: new Date(),
+						updatedAt: new Date(),
+					})
+					.where(eq(schema.appStore.slug, req.slug))
+					.returning();
+
+				if (!updated) {
+					msg.respond(JSON.stringify({ ok: false, error: 'App not found' }));
+					return;
+				}
+
+				msg.respond(JSON.stringify({ ok: true, entry: updated }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Store: reject app ---
+	{
+		subject: SUBJECTS.apps.store.reject(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{ slug: string; rejectionReason?: string; rejectedBy?: string }>();
+				if (!req.slug) {
+					msg.respond(JSON.stringify({ ok: false, error: 'slug is required' }));
+					return;
+				}
+
+				const MAX_REJECTION_REASON_LENGTH = 500;
+				const sanitizedReason = req.rejectionReason
+					? req.rejectionReason.replace(/<[^>]*>/g, '').slice(0, MAX_REJECTION_REASON_LENGTH)
+					: undefined;
+
+				const [updated] = await db()
+					.update(schema.appStore)
+					.set({
+						approvalStatus: 'rejected',
+						rejectionReason: sanitizedReason,
 						updatedAt: new Date(),
 					})
 					.where(eq(schema.appStore.slug, req.slug))
