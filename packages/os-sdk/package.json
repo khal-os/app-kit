@@ -18,7 +18,8 @@
 		"./db/schema": "./src/db/schema/index.ts",
 		"./db/claim": "./src/db/claim.ts",
 		"./db/operators": "./src/db/operators.ts",
-		"./app": "./src/app/index.ts"
+		"./app": "./src/app/index.ts",
+		"./app/roles": "./src/app/roles.ts"
 	},
 	"peerDependencies": {
 		"@nats-io/jetstream": ">=3",
