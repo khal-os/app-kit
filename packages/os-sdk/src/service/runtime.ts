@@ -59,6 +59,8 @@ export interface ServiceConfig {
 	onShutdown?: () => void | Promise<void>;
 	/** Observability config for auto-instrumentation. */
 	observe?: ObserveConfig;
+	/** App ID for constructing standard subjects. If set, registers AI control surface. */
+	appId?: string;
 }
 
 /** Default subject patterns excluded from handler event auto-capture. */
@@ -134,7 +136,7 @@ async function plainHandler(
  * Errors during startup cause process.exit(1) via the .catch() wrapper.
  */
 export async function createService(config: ServiceConfig): Promise<void> {
-	const { name, subscriptions = [], onReady, onShutdown, observe } = config;
+	const { name, subscriptions = [], onReady, onShutdown, observe, appId } = config;
 
 	const nc = await connect({ servers: NATS_URL });
 
@@ -157,6 +159,44 @@ export async function createService(config: ServiceConfig): Promise<void> {
 
 		return sub;
 	});
+
+	// AI Control Surface: auto-wire standard subjects when appId is provided
+	if (appId) {
+		const capSub = nc.subscribe(`khal.*.${appId}.capabilities`);
+		subs.push(capSub);
+		log.info(`subscribed to khal.*.${appId}.capabilities (auto)`);
+		spawnMessageLoop(capSub, false, nc, log, name, `khal.*.${appId}.capabilities`, async (msg) => {
+			const capabilities = {
+				appId,
+				service: name,
+				subjects: subscriptions.map((s) => ({
+					subject: s.subject,
+					type: s.subject.includes('.query.') ? 'query' : s.subject.includes('.command.') ? 'command' : 'handler',
+				})),
+				standard: [`khal.*.${appId}.capabilities`, `khal.*.${appId}.health`, `khal.*.${appId}.events.>`],
+			};
+			if (msg.reply) {
+				msg.respond(JSON.stringify(capabilities));
+			}
+		});
+
+		const appHealthSub = nc.subscribe(`khal.*.${appId}.health`);
+		subs.push(appHealthSub);
+		log.info(`subscribed to khal.*.${appId}.health (auto)`);
+		spawnMessageLoop(appHealthSub, false, nc, log, name, `khal.*.${appId}.health`, async (msg) => {
+			if (msg.reply) {
+				msg.respond(
+					JSON.stringify({
+						appId,
+						service: name,
+						status: 'healthy',
+						uptime: process.uptime(),
+						ts: new Date().toISOString(),
+					})
+				);
+			}
+		});
+	}
 
 	// Notify the service that everything is wired up.
 	if (onReady) {
@@ -256,4 +296,17 @@ async function instrumentedHandler(
 	} catch {
 		// Never let observability failures affect service operation.
 	}
+}
+
+/**
+ * Create an event publisher for AI-accessible app events.
+ * Published to khal.{orgId}.{appId}.events.{eventType}
+ */
+export function createEventPublisher(nc: NatsConnection, appId: string) {
+	return (orgId: string, eventType: string, data: unknown) => {
+		nc.publish(
+			`khal.${orgId}.${appId}.events.${eventType}`,
+			JSON.stringify({ ts: new Date().toISOString(), type: eventType, data })
+		);
+	};
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { SUBJECTS, useNats } from '@khal-os/sdk/app';
-import { Bell, Command, Info, Monitor, Radio } from 'lucide-react';
+import { Bell, Command, Info, Monitor, Package, Radio, Server } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { EmptyState, PropertyPanel, SectionHeader, SidebarNav, SplitPane, StatusBar } from '@/components/os-primitives';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ import { useThemeStore } from '@/stores/theme-store';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 
-type SettingsTab = 'appearance' | 'notifications' | 'keyboard' | 'about' | 'nats';
+type SettingsTab = 'appearance' | 'notifications' | 'keyboard' | 'about' | 'nats' | 'services' | 'apps';
 
 const NAV_ITEMS: Array<{ id: SettingsTab; label: string; icon: React.ComponentType; devOnly?: boolean }> = [
 	{ id: 'appearance', label: 'Appearance', icon: Monitor },
@@ -27,6 +27,8 @@ const NAV_ITEMS: Array<{ id: SettingsTab; label: string; icon: React.ComponentTy
 	{ id: 'keyboard', label: 'Keyboard Shortcuts', icon: Command },
 	{ id: 'about', label: 'About', icon: Info },
 	{ id: 'nats', label: 'NATS Echo Test', icon: Radio, devOnly: true },
+	{ id: 'services', label: 'Services', icon: Server, devOnly: true },
+	{ id: 'apps', label: 'Apps', icon: Package },
 ];
 
 export function Settings(_props: { windowId: string; meta?: Record<string, unknown> }) {
@@ -59,6 +61,8 @@ export function Settings(_props: { windowId: string; meta?: Record<string, unkno
 						{tab === 'keyboard' && <KeyboardShortcutsTab />}
 						{tab === 'about' && <AboutTab />}
 						{tab === 'nats' && <NatsEchoTab />}
+						{tab === 'services' && <ServicesTab />}
+						{tab === 'apps' && <AppsTab />}
 					</SplitPane.Panel>
 				</SplitPane>
 			</div>
@@ -309,6 +313,253 @@ function NatsEchoTab() {
 					)}
 				</div>
 			</section>
+		</div>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Services Tab (dev only)
+// ---------------------------------------------------------------------------
+
+interface ServiceInfo {
+	name: string;
+	running: boolean;
+	pid: number | null;
+	source: string;
+	ports: number[];
+	proxyPorts: Array<{ internalPort: number; proxyPort: number }>;
+	restartPolicy: string;
+	circuitBroken: boolean;
+}
+
+function ServicesTab() {
+	const { connected, request, subscribe, orgId } = useNats();
+	const [services, setServices] = useState<ServiceInfo[]>([]);
+	const [selectedService, setSelectedService] = useState<string | null>(null);
+	const [logLines, setLogLines] = useState<string[]>([]);
+	const [loading, setLoading] = useState(true);
+
+	// Fetch service list
+	useEffect(() => {
+		if (!connected) return;
+		const fetchServices = async () => {
+			try {
+				const reply = await request(`khal.${orgId}.services.list`, {});
+				setServices((reply as { services?: ServiceInfo[] }).services ?? []);
+			} catch {
+				// silent
+			} finally {
+				setLoading(false);
+			}
+		};
+		fetchServices();
+		const interval = setInterval(fetchServices, 10_000);
+		return () => clearInterval(interval);
+	}, [connected, request, orgId]);
+
+	// Subscribe to live logs for selected service
+	useEffect(() => {
+		if (!selectedService || !connected) return;
+		setLogLines([]);
+		request(`khal.${orgId}.services.logs.${selectedService}.history`, { lines: 200 })
+			.then((reply) => setLogLines((reply as { lines?: string[] }).lines ?? []))
+			.catch(() => {});
+		const unsub = subscribe(`khal.*.services.logs.${selectedService}`, (data) => {
+			const d = data as { stream?: string; line?: string };
+			setLogLines((prev) => [...prev.slice(-999), `[${d.stream}] ${d.line}`]);
+		});
+		return unsub;
+	}, [selectedService, connected, request, subscribe, orgId]);
+
+	const handleRestart = async (name: string) => {
+		await request(`khal.${orgId}.services.restart.${name}`, {});
+	};
+	const handleStop = async (name: string) => {
+		await request(`khal.${orgId}.services.stop.${name}`, {});
+	};
+	const handleStart = async (name: string) => {
+		await request(`khal.${orgId}.services.start.${name}`, {});
+	};
+
+	if (loading) return <div className="p-4 text-gray-800">Loading services...</div>;
+
+	return (
+		<div className="flex max-w-3xl flex-col gap-6 text-gray-1000">
+			<section>
+				<SectionHeader title="Services" description="Manage backend services registered via app manifests." />
+				<div className="rounded-lg border border-gray-alpha-200 bg-background-100">
+					{services.length === 0 && (
+						<div className="p-4 text-center text-copy-13 text-gray-700">No services registered.</div>
+					)}
+					{services.map((svc, i) => (
+						<div
+							key={svc.name}
+							className={`flex items-center justify-between px-4 py-3 ${i > 0 ? 'border-t border-gray-alpha-100' : ''}`}
+						>
+							<div className="flex items-center gap-3">
+								<span className={`h-2.5 w-2.5 rounded-full ${svc.running ? 'bg-green-500' : 'bg-red-500'}`} />
+								<div>
+									<button
+										className="text-copy-13 font-medium text-gray-1000 hover:underline"
+										onClick={() => setSelectedService(svc.name === selectedService ? null : svc.name)}
+									>
+										{svc.name}
+									</button>
+									<div className="flex gap-2 text-copy-12 text-gray-700">
+										{svc.pid && <span>PID {svc.pid}</span>}
+										<span>{svc.source}</span>
+										{svc.restartPolicy && <span>{svc.restartPolicy}</span>}
+										{svc.ports?.length > 0 && <span>ports: {svc.ports.join(', ')}</span>}
+									</div>
+								</div>
+							</div>
+							<div className="flex gap-2">
+								{svc.running ? (
+									<>
+										<Button size="small" variant="secondary" onClick={() => handleRestart(svc.name)}>
+											Restart
+										</Button>
+										<Button size="small" variant="secondary" onClick={() => handleStop(svc.name)}>
+											Stop
+										</Button>
+									</>
+								) : (
+									<Button size="small" variant="secondary" onClick={() => handleStart(svc.name)}>
+										Start
+									</Button>
+								)}
+							</div>
+						</div>
+					))}
+				</div>
+			</section>
+
+			{selectedService && (
+				<section>
+					<SectionHeader title={`Logs: ${selectedService}`} description="Live service output." />
+					<div className="h-64 overflow-auto rounded-lg border border-gray-alpha-200 bg-gray-alpha-50 p-3 font-mono text-copy-12 text-gray-900">
+						{logLines.length === 0 ? (
+							<div className="text-gray-600">No log output yet.</div>
+						) : (
+							logLines.map((line, i) => (
+								<div key={i} className="whitespace-pre-wrap break-all">
+									{line}
+								</div>
+							))
+						)}
+					</div>
+				</section>
+			)}
+		</div>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Apps Tab
+// ---------------------------------------------------------------------------
+
+interface AppInfo {
+	name: string;
+	id: string;
+	hasTauri: boolean;
+	serviceCount: number;
+	viewCount: number;
+}
+
+function AppsTab() {
+	const { connected, request, orgId } = useNats();
+	const [apps, setApps] = useState<AppInfo[]>([]);
+	const [exporting, setExporting] = useState<string | null>(null);
+	const [exportResult, setExportResult] = useState<{ app: string; success: boolean; message: string } | null>(null);
+
+	useEffect(() => {
+		if (!connected) return;
+		const fetchApps = async () => {
+			try {
+				const reply = await request(`khal.${orgId}.services.list`, {});
+				const services = (reply as { services?: Array<{ name: string }> }).services ?? [];
+				const appMap = new Map<string, AppInfo>();
+				for (const svc of services) {
+					const appId = svc.name;
+					if (!appMap.has(appId)) {
+						appMap.set(appId, {
+							name: appId.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+							id: appId,
+							hasTauri: false,
+							serviceCount: 0,
+							viewCount: 1,
+						});
+					}
+					const app = appMap.get(appId)!;
+					app.serviceCount++;
+				}
+				setApps(Array.from(appMap.values()));
+			} catch {
+				// silent
+			}
+		};
+		fetchApps();
+	}, [connected, request, orgId]);
+
+	const handleExport = (appId: string) => {
+		setExporting(appId);
+		setExportResult(null);
+		setTimeout(() => {
+			setExporting(null);
+			setExportResult({
+				app: appId,
+				success: false,
+				message: 'Tauri build requires src-tauri/ directory. Run `bun run tauri init` in the app package first.',
+			});
+		}, 1000);
+	};
+
+	return (
+		<div className="flex max-w-3xl flex-col gap-6 text-gray-1000">
+			<section>
+				<SectionHeader
+					title="Installed Apps"
+					description="Apps registered in Khal OS. Export standalone desktop binaries via Tauri."
+				/>
+				<div className="rounded-lg border border-gray-alpha-200 bg-background-100">
+					{apps.length === 0 && <div className="p-4 text-center text-copy-13 text-gray-700">No apps detected.</div>}
+					{apps.map((app, i) => (
+						<div
+							key={app.id}
+							className={`flex items-center justify-between px-4 py-3 ${i > 0 ? 'border-t border-gray-alpha-100' : ''}`}
+						>
+							<div>
+								<p className="text-copy-13 font-medium text-gray-1000">{app.name}</p>
+								<div className="flex gap-3 text-copy-12 text-gray-700">
+									<span>
+										{app.serviceCount} service{app.serviceCount !== 1 ? 's' : ''}
+									</span>
+									<span>
+										{app.viewCount} view{app.viewCount !== 1 ? 's' : ''}
+									</span>
+									{app.hasTauri && <span className="text-green-700">Tauri ready</span>}
+								</div>
+							</div>
+							<div className="flex gap-2">
+								<Button
+									size="small"
+									variant="secondary"
+									onClick={() => handleExport(app.id)}
+									disabled={exporting === app.id}
+								>
+									{exporting === app.id ? 'Exporting...' : 'Export Desktop App'}
+								</Button>
+							</div>
+						</div>
+					))}
+				</div>
+			</section>
+
+			{exportResult && (
+				<Note type={exportResult.success ? 'success' : 'warning'} size="small">
+					<strong>{exportResult.app}:</strong> {exportResult.message}
+				</Note>
+			)}
 		</div>
 	);
 }

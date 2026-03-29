@@ -28,6 +28,36 @@ export interface AppManifestView {
 	component: string;
 }
 
+/** Health check configuration for a service. */
+export interface ServiceHealthConfig {
+	/** Check type: tcp (connect to port), http (GET endpoint), command (run shell). */
+	type: 'tcp' | 'http' | 'command';
+	/** Target: port number for tcp, URL for http, shell command for command. */
+	target: string | number;
+	/** Check interval in milliseconds (default: 30000). */
+	interval?: number;
+	/** Timeout in milliseconds (default: 5000). */
+	timeout?: number;
+}
+
+/** Service declaration within an app manifest. */
+export interface AppServiceConfig {
+	/** Service name (must be unique across the app). */
+	name: string;
+	/** Shell command to start the service (alternative to entry). */
+	command?: string;
+	/** Entry point file path relative to the package root. */
+	entry?: string;
+	/** Runtime environment. */
+	runtime?: 'node' | 'python';
+	/** Health check configuration. */
+	health?: ServiceHealthConfig;
+	/** Restart policy. */
+	restart?: 'always' | 'on-failure' | 'never';
+	/** Ports the service binds to internally. Khal assigns proxy ports. */
+	ports?: number[];
+}
+
 /**
  * Full app manifest — the type for `manifest.ts` files in KhalOS app packages.
  *
@@ -41,6 +71,8 @@ export interface AppManifest {
 	views: AppManifestView[];
 	/** Desktop integration configuration. */
 	desktop: AppDesktopConfig;
+	/** Backend services this app runs. Optional — pure UI apps have no services. */
+	services?: AppServiceConfig[];
 }
 
 /**

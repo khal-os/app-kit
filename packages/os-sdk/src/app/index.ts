@@ -3,9 +3,15 @@ export type { KhalAuth } from './auth';
 export { useKhalAuth } from './auth';
 
 // Hooks
-export { useNats, useNatsSubscription } from './hooks';
+export { useNats, useNatsSubscription, useService } from './hooks';
 // Manifest
-export type { AppDesktopConfig, AppManifest, AppManifestView } from './manifest';
+export type {
+	AppDesktopConfig,
+	AppManifest,
+	AppManifestView,
+	AppServiceConfig,
+	ServiceHealthConfig,
+} from './manifest';
 export { defineManifest } from './manifest';
 // NATS client
 export { getNatsClient } from './nats-client';

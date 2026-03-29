@@ -36,6 +36,9 @@ export { FirecrackerRuntime } from './firecracker';
 export { LocalRuntime } from './local';
 export { OCIRuntime } from './oci';
 export { RemoteRuntime } from './remote';
+export type { TauriManagedService, TauriSupervisorConfig } from './tauri';
+// Tauri standalone supervisor
+export { createTauriSupervisor, TauriSupervisor } from './tauri';
 // Types
 export type {
 	HealthStatus,
