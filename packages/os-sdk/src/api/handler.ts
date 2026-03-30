@@ -1,6 +1,7 @@
 import { withAuth } from '@workos-inc/authkit-nextjs';
 import { type NextRequest, NextResponse } from 'next/server';
 import { type Database, getDb } from '../db/factory';
+import { isLocalMode } from '../lib/local-mode';
 
 export interface ApiContext {
 	/** Authenticated WorkOS user. Always present (401 returned if not). */
@@ -40,7 +41,7 @@ function isHeadlessChrome(req: NextRequest): boolean {
 export function apiHandler(fn: (ctx: ApiContext) => Promise<Response>): RouteHandler {
 	return async (req: NextRequest, ..._args: unknown[]) => {
 		const auth = await withAuth();
-		if (!auth.user && !isHeadlessChrome(req)) {
+		if (!auth.user && !isHeadlessChrome(req) && !isLocalMode()) {
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 		}
 
@@ -56,7 +57,7 @@ export function apiHandler(fn: (ctx: ApiContext) => Promise<Response>): RouteHan
 export function apiHandlerWithDb(fn: (ctx: ApiContextWithDb) => Promise<Response>): RouteHandler {
 	return async (req: NextRequest, ..._args: unknown[]) => {
 		const auth = await withAuth();
-		if (!auth.user && !isHeadlessChrome(req)) {
+		if (!auth.user && !isHeadlessChrome(req) && !isLocalMode()) {
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 		}
 
