@@ -20,6 +20,7 @@
 		"./db/operators": "./src/db/operators.ts",
 		"./app": "./src/app/index.ts",
 		"./app/roles": "./src/app/roles.ts",
+		"./app/subjects": "./src/app/subjects.ts",
 		"./lib/local-mode": "./src/lib/local-mode.ts"
 	},
 	"peerDependencies": {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SUBJECTS } from '@khal-os/sdk/app';
+import { SUBJECTS } from '@khal-os/sdk/app/subjects';
 import type { NatsConnection } from '@nats-io/transport-node';
 import * as pty from 'node-pty';
 import type {
