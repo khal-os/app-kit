@@ -19,7 +19,8 @@
 		"./db/claim": "./src/db/claim.ts",
 		"./db/operators": "./src/db/operators.ts",
 		"./app": "./src/app/index.ts",
-		"./app/roles": "./src/app/roles.ts"
+		"./app/roles": "./src/app/roles.ts",
+		"./lib/local-mode": "./src/lib/local-mode.ts"
 	},
 	"peerDependencies": {
 		"@nats-io/jetstream": ">=3",
