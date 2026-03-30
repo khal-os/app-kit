@@ -160,6 +160,8 @@ export class LocalRuntime extends BaseRuntime {
 			...process.env,
 			...this.config.env,
 			OS_SECRET: this.config.env?.OS_SECRET ?? generateSecret(),
+			NEXT_PUBLIC_KHAL_MODE: 'local',
+			NEXT_PUBLIC_KHAL_INSTANCE_ID: this.config.env?.KHAL_INSTANCE_ID ?? 'default',
 		};
 
 		const projectRoot = this.config.projectRoot;
