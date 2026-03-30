@@ -568,9 +568,9 @@ export const appsHandlers: ServiceHandler[] = [
 			try {
 				const rows = await db().select().from(schema.appStore).where(eq(schema.appStore.approvalStatus, 'approved'));
 
-				msg.respond(JSON.stringify({ apps: rows }));
+				msg.respond(JSON.stringify({ items: rows }));
 			} catch (err) {
-				msg.respond(JSON.stringify({ error: String(err), apps: [] }));
+				msg.respond(JSON.stringify({ error: String(err), items: [] }));
 			}
 		},
 	},
