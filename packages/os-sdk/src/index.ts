@@ -1,5 +1,7 @@
-export type { ApiContext, ApiContextWithDb } from './api/handler';
+export type { ApiContext, ApiContextWithDb, ApiUser } from './api/handler';
 export { apiHandler, apiHandlerWithDb } from './api/handler';
+export type { SessionResult, SessionUser } from './api/session';
+export { readSession } from './api/session';
 export {
 	AGENT_REPO_ROOT_ENV,
 	AGENT_WORKTREE_ROOT_ENV,

@@ -21,7 +21,8 @@
 		"./app": "./src/app/index.ts",
 		"./app/roles": "./src/app/roles.ts",
 		"./app/subjects": "./src/app/subjects.ts",
-		"./lib/local-mode": "./src/lib/local-mode.ts"
+		"./lib/local-mode": "./src/lib/local-mode.ts",
+		"./api/session": "./src/api/session.ts"
 	},
 	"peerDependencies": {
 		"@nats-io/jetstream": ">=3",

@@ -208,8 +208,19 @@ class NatsClient {
 	}
 
 	private handleErrorFrame(frame: Record<string, unknown>): void {
-		// biome-ignore lint/suspicious/noConsole: client-side debug logging for NATS errors
-		console.warn('[nats-client] server error:', frame.error);
+		const reason = typeof frame.reason === 'string' ? frame.reason : undefined;
+		const subject = typeof frame.subject === 'string' ? frame.subject : undefined;
+
+		if (reason && subject) {
+			// biome-ignore lint/suspicious/noConsole: client-side debug logging for NATS errors
+			console.warn(`[nats-client] ${reason}: ${subject} — ${frame.error}`);
+		} else if (reason) {
+			// biome-ignore lint/suspicious/noConsole: client-side debug logging for NATS errors
+			console.warn(`[nats-client] ${reason}: ${frame.error}`);
+		} else {
+			// biome-ignore lint/suspicious/noConsole: client-side debug logging for NATS errors
+			console.warn('[nats-client] server error:', frame.error);
+		}
 	}
 
 	private handleReplyFrame(id: string, data: unknown): void {
