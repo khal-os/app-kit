@@ -1,12 +1,9 @@
 'use client';
 
 import { useNats } from '@khal-os/sdk/app';
+import { Button, EmptyState, Note, Spinner, StatusBar } from '@khal-os/ui';
 import { Mic, Plus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { EmptyState, StatusBar } from '@/components/os-primitives';
-import { Button } from '@/components/ui/button';
-import { Note } from '@/components/ui/note';
-import { Spinner } from '@/components/ui/spinner';
 import { AgentCard } from './AgentCard';
 import { AgentFormDialog } from './AgentFormDialog';
 import { ConfirmDialog } from './ConfirmDialog';

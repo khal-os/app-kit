@@ -1,9 +1,8 @@
 'use client';
 
+import { Button, Input } from '@khal-os/ui';
 import { ChevronRight, Save } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import type { AgentConfig } from '../../lib/types';
 
 interface AgentConfigSidebarProps {

@@ -1,10 +1,9 @@
 'use client';
 
+import { useNats } from '@khal-os/sdk/app';
+import { Button, Input } from '@khal-os/ui';
 import { PhoneForwarded } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { useNats } from '@/lib/hooks/use-nats';
 import { cmd, TRANSFER } from '../../lib/subjects';
 
 interface TakeoverButtonProps {

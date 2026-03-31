@@ -1,7 +1,7 @@
 'use client';
 
+import { useNats } from '@khal-os/sdk/app';
 import { useCallback, useEffect, useState } from 'react';
-import { useNats } from '@/lib/hooks/use-nats';
 import { AGENT_CONFIG, AGENT_LIST } from '../subjects';
 import type { AgentConfig, AgentInfo } from '../types';
 

@@ -1,7 +1,7 @@
 'use client';
 
+import { useNats } from '@khal-os/sdk/app';
 import { useEffect, useRef, useState } from 'react';
-import { useNats } from '@/lib/hooks/use-nats';
 import { CALL_STATE, event } from '../subjects';
 import type { CallState, CallStatus } from '../types';
 
