@@ -1,15 +1,19 @@
 // App component props type
+export interface AppComponentProps {
+	windowId: string;
+	meta?: Record<string, unknown>;
+}
 
 // Auth — re-export from SDK
 export { SUBJECTS, useKhalAuth, useKhalAuth as useOSAuth, useNats, useNatsSubscription } from '@khal-os/sdk/app';
-export type { AppComponentProps } from '@/components/apps/app-registry';
 // Hooks
-export { useReducedMotion } from '@/hooks/useReducedMotion';
+export { useReducedMotion } from './hooks/useReducedMotion';
 // Animations
-export { fadeIn, fadeUp, khalEasing, scaleUp, springConfig, staggerChild, staggerContainer } from '@/lib/animations';
+export { fadeIn, fadeUp, khalEasing, scaleUp, springConfig, staggerChild, staggerContainer } from './lib/animations';
 // Stores (OS-level state)
-export { useNotificationStore } from '@/stores/notification-store';
-export { useThemeStore } from '@/stores/theme-store';
+export { useNotificationStore } from './stores/notification-store';
+export type { DesktopNotifMode, DesktopNotification, NotificationUrgency, TrayIcon } from './stores/notification-store';
+export { useThemeStore } from './stores/theme-store';
 // shadcn/ui components — local implementations
 export * from './components/avatar';
 export * from './components/badge';

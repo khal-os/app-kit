@@ -2,7 +2,7 @@
 
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
 import { useEffect } from 'react';
-import { useThemeStore } from '@/stores/theme-store';
+import { useThemeStore } from '../stores/theme-store';
 
 function ReduceMotionSync() {
 	const reduceMotion = useThemeStore((s) => s.reduceMotion);

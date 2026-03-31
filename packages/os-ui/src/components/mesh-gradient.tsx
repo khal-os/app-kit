@@ -1,7 +1,7 @@
 'use client';
 
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 const MeshGradientShader = lazy(() => import('@paper-design/shaders-react').then((m) => ({ default: m.MeshGradient })));
 
