@@ -21,6 +21,7 @@
 		"./app": "./src/app/index.ts",
 		"./app/roles": "./src/app/roles.ts",
 		"./app/subjects": "./src/app/subjects.ts",
+		"./api/handler": "./src/api/handler.ts",
 		"./lib/local-mode": "./src/lib/local-mode.ts"
 	},
 	"peerDependencies": {
