@@ -12,7 +12,7 @@ export default {
 		},
 	],
 	desktop: {
-		icon: '/icons/dusk/circuit.svg',
+		icon: '/icons/dusk/electron.svg',
 		categories: ['Development'],
 		comment: 'Visual voice agent flow builder',
 	},
