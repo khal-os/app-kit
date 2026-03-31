@@ -1,11 +1,11 @@
 'use client';
 
 import { SUBJECTS, useNats } from '@khal-os/sdk/app';
+import { useThemeStore } from '@khal-os/ui';
 import type { FitAddon } from '@xterm/addon-fit';
 import type { WebglAddon } from '@xterm/addon-webgl';
 import type { Terminal } from '@xterm/xterm';
 import { useEffect, useRef } from 'react';
-import { useThemeStore } from '@/stores/theme-store';
 
 /** Resolve a CSS custom property from :root to its computed value. */
 function resolveVar(name: string, fallback: string): string {
