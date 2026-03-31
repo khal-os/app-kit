@@ -8,7 +8,7 @@ const manifest = {
 			minRole: 'platform-admin' as const,
 			natsPrefix: 'hello',
 			defaultSize: { width: 1200, height: 800 },
-			component: '@khal-os/hello-sac/views/hello-sac',
+			component: './views/hello-sac',
 		},
 	],
 	desktop: {
