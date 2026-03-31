@@ -1,7 +1,7 @@
 'use client';
 
+import { useNats } from '@khal-os/sdk/app';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNats } from '@/lib/hooks/use-nats';
 import { allEvents } from '../subjects';
 import type { TranscriptEntry } from '../types';
 

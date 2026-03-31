@@ -8,6 +8,10 @@
 		"./components": "./components.ts",
 		"./views/*": "./views/*"
 	},
+	"dependencies": {
+		"@khal-os/sdk": "workspace:*",
+		"@khal-os/ui": "workspace:*"
+	},
 	"peerDependencies": {
 		"react": ">=19"
 	}

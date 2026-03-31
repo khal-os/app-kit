@@ -1,11 +1,9 @@
 'use client';
 
+import { useNats } from '@khal-os/sdk/app';
+import { Badge, Button, Input } from '@khal-os/ui';
 import { Phone, PhoneOff } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { useNats } from '@/lib/hooks/use-nats';
 import { CALL_START } from '../../lib/subjects';
 import type { AgentInfo, CallState } from '../../lib/types';
 

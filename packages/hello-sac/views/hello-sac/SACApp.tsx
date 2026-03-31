@@ -1,9 +1,9 @@
 'use client';
 
+import { useNats } from '@khal-os/sdk/app';
+import { EmptyState, SplitPane, StatusBar, Toolbar } from '@khal-os/ui';
 import { Keyboard, Phone, Settings } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { EmptyState, SplitPane, StatusBar, Toolbar } from '@/components/os-primitives';
-import { useNats } from '@/lib/hooks/use-nats';
 import { useAgentConfig } from '../../lib/hooks/use-agent-config';
 import { useCallState } from '../../lib/hooks/use-call-state';
 import { useTranscript } from '../../lib/hooks/use-transcript';

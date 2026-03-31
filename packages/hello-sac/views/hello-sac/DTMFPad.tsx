@@ -1,7 +1,7 @@
 'use client';
 
+import { useNats } from '@khal-os/sdk/app';
 import { useCallback } from 'react';
-import { useNats } from '@/lib/hooks/use-nats';
 import { cmd, SEND_DTMF } from '../../lib/subjects';
 
 interface DTMFPadProps {

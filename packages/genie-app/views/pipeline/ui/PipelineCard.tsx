@@ -1,7 +1,6 @@
 'use client';
 
-import { Avatar, Badge, GlassCard, ProgressBar, StatusDot } from '@khal-os/ui';
-import { cn } from '@/lib/utils';
+import { Avatar, Badge, cn, GlassCard, ProgressBar, StatusDot } from '@khal-os/ui';
 import type { PipelineCardProps, Priority } from '../types';
 
 const priorityVariantMap: Record<Priority, 'red' | 'amber' | 'blue' | 'gray'> = {

@@ -9,6 +9,7 @@
 		"./views/*": "./views/*"
 	},
 	"dependencies": {
+		"@khal-os/sdk": "workspace:*",
 		"@khal-os/ui": "workspace:*"
 	},
 	"devDependencies": {
