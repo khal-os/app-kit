@@ -628,9 +628,21 @@ export const appsHandlers: ServiceHandler[] = [
 		subject: SUBJECTS.apps.store.list(),
 		handler: async (msg) => {
 			try {
-				const rows = await db().select().from(schema.appStore).where(eq(schema.appStore.approvalStatus, 'approved'));
+				const rows = await db()
+					.select({
+						store: schema.appStore,
+						installedSlug: schema.installedApps.slug,
+					})
+					.from(schema.appStore)
+					.leftJoin(schema.installedApps, eq(schema.appStore.slug, schema.installedApps.slug))
+					.where(eq(schema.appStore.approvalStatus, 'approved'));
 
-				msg.respond(JSON.stringify({ items: rows }));
+				const items = rows.map((r) => ({
+					...r.store,
+					installed: r.installedSlug !== null,
+				}));
+
+				msg.respond(JSON.stringify({ items }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err), items: [] }));
 			}
