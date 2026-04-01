@@ -8,6 +8,10 @@ interface ThemeStore {
 	setMode: (mode: ThemeMode) => void;
 	reduceMotion: boolean;
 	setReduceMotion: (value: boolean) => void;
+	glassEnabled: boolean;
+	setGlassEnabled: (value: boolean) => void;
+	gpuTerminals: boolean;
+	setGpuTerminals: (value: boolean) => void;
 }
 
 export const useThemeStore = create<ThemeStore>()(
@@ -17,6 +21,10 @@ export const useThemeStore = create<ThemeStore>()(
 			setMode: (mode) => set({ mode }),
 			reduceMotion: false,
 			setReduceMotion: (reduceMotion) => set({ reduceMotion }),
+			glassEnabled: false,
+			setGlassEnabled: (glassEnabled) => set({ glassEnabled }),
+			gpuTerminals: false,
+			setGpuTerminals: (gpuTerminals) => set({ gpuTerminals }),
 		}),
 		{
 			name: 'khal-theme',
