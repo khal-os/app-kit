@@ -122,7 +122,6 @@ const MARKETPLACE_MANIFEST = {
 			minRole: 'member',
 			natsPrefix: 'apps',
 			defaultSize: { width: 1000, height: 700 },
-			fullSizeContent: true,
 		},
 	],
 	desktop: {
