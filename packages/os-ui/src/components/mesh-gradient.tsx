@@ -41,10 +41,10 @@ function MeshGradientInner({ colors, speed = 0.02, className, style }: MeshGradi
 	}, []);
 
 	return (
-		<div ref={ref} className={className} style={{ width: '100%', height: '100%', ...style }}>
+		<div ref={ref} className={className} style={{ position: 'absolute', inset: 0, ...style }}>
 			{visible && !reducedMotion ? (
 				<Suspense fallback={<StaticFallback colors={colors} />}>
-					<MeshGradientShader colors={colors} speed={speed} />
+					<MeshGradientShader colors={colors} speed={speed} style={{ width: '100%', height: '100%' }} />
 				</Suspense>
 			) : (
 				<StaticFallback colors={colors} />

@@ -17,6 +17,7 @@ export function KhalLogo({ size = 20, variant = 'light', className }: KhalLogoPr
 			style={{
 				display: 'inline-flex',
 				alignItems: 'center',
+				fontFamily: 'var(--font-sora), Sora, sans-serif',
 				fontSize,
 				fontWeight: 700,
 				letterSpacing: `${tracking}em`,
