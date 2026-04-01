@@ -14,3 +14,16 @@ export const WindowMinimizedProvider = WindowMinimizedContext.Provider;
 export function useWindowMinimized(): boolean {
 	return useContext(WindowMinimizedContext);
 }
+
+/**
+ * Exposes the parent window's focused/active state to child components.
+ * Apps use this to pause polling, animations, and heavy rendering when
+ * their window is behind another (app-nap behavior).
+ */
+const WindowActiveContext = createContext(true);
+
+export const WindowActiveProvider = WindowActiveContext.Provider;
+
+export function useWindowActive(): boolean {
+	return useContext(WindowActiveContext);
+}
