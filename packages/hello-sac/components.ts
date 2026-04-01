@@ -1,6 +1,7 @@
 'use client';
 
-import { type ComponentType, lazy } from 'react';
+import type { ComponentType } from 'react';
+import { SACApp } from './views/hello-sac/SACApp';
 
 interface AppComponentProps {
 	windowId: string;
@@ -8,5 +9,5 @@ interface AppComponentProps {
 }
 
 export const components: Record<string, ComponentType<AppComponentProps>> = {
-	'hello-sac': lazy(() => import('./views/hello-sac/SACApp').then((m) => ({ default: m.SACApp }))),
+	'hello-sac': SACApp,
 };

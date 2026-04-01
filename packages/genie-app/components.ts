@@ -1,6 +1,8 @@
 'use client';
 
-import { type ComponentType, lazy } from 'react';
+import type { ComponentType } from 'react';
+import { GenieApp } from './views/genie/ui/GenieApp';
+import { PipelineView } from './views/pipeline/ui/PipelineView';
 
 interface AppComponentProps {
 	windowId: string;
@@ -8,6 +10,6 @@ interface AppComponentProps {
 }
 
 export const components: Record<string, ComponentType<AppComponentProps>> = {
-	genie: lazy(() => import('./views/genie/ui/GenieApp').then((m) => ({ default: m.GenieApp }))),
-	pipeline: lazy(() => import('./views/pipeline/ui/PipelineView').then((m) => ({ default: m.PipelineView }))),
+	genie: GenieApp,
+	pipeline: PipelineView,
 };

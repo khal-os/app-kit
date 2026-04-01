@@ -1,5 +1,6 @@
 'use client';
-import { type ComponentType, lazy } from 'react';
+import type { ComponentType } from 'react';
+import { AgentManager } from './views/agent-manager/AgentManager';
 
 interface AppComponentProps {
 	windowId: string;
@@ -7,5 +8,5 @@ interface AppComponentProps {
 }
 
 export const components: Record<string, ComponentType<AppComponentProps>> = {
-	'agent-manager': lazy(() => import('./views/agent-manager/AgentManager').then((m) => ({ default: m.AgentManager }))),
+	'agent-manager': AgentManager,
 };

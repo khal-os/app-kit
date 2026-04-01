@@ -1,5 +1,6 @@
 'use client';
-import { type ComponentType, lazy } from 'react';
+import type { ComponentType } from 'react';
+import FlowDesignerApp from './views/flow-designer/ui/FlowDesignerApp';
 
 interface AppComponentProps {
 	windowId: string;
@@ -7,5 +8,5 @@ interface AppComponentProps {
 }
 
 export const components: Record<string, ComponentType<AppComponentProps>> = {
-	'flow-designer': lazy(() => import('./views/flow-designer/ui/FlowDesignerApp')),
+	'flow-designer': FlowDesignerApp,
 };
