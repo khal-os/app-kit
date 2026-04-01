@@ -1,7 +1,7 @@
 'use client';
 
 import { SUBJECTS, useNats } from '@khal-os/sdk/app';
-import { useThemeStore } from '@khal-os/ui';
+import { useThemeStore, useWindowMinimized } from '@khal-os/ui';
 import type { FitAddon } from '@xterm/addon-fit';
 import type { WebglAddon } from '@xterm/addon-webgl';
 import type { Terminal } from '@xterm/xterm';
@@ -81,6 +81,7 @@ export function TerminalPane({
 	onCwdChange,
 	onLastCommandChange,
 }: TerminalPaneProps) {
+	const minimized = useWindowMinimized();
 	const containerRef = useRef<HTMLDivElement>(null);
 	const terminalRef = useRef<Terminal | null>(null);
 	const fitAddonRef = useRef<FitAddon | null>(null);
@@ -469,6 +470,38 @@ export function TerminalPane({
 			observer.disconnect();
 		};
 	}, []);
+
+	// Dispose WebGL on minimize, re-attach on restore (saves GPU contexts)
+	useEffect(() => {
+		if (minimized) {
+			if (webglAddonRef.current) {
+				try {
+					webglAddonRef.current.dispose();
+				} catch {
+					// ignore
+				}
+				webglAddonRef.current = null;
+			}
+		} else {
+			// Restore: re-attach WebGL if GPU setting is enabled and terminal exists
+			const terminal = terminalRef.current;
+			if (!terminal || webglAddonRef.current) return;
+			const gpuEnabled = typeof localStorage !== 'undefined' && localStorage.getItem('khal-gpu-terminals') === 'true';
+			if (!gpuEnabled) return;
+			(async () => {
+				try {
+					const webglMod = await import('@xterm/addon-webgl');
+					if (!terminalRef.current || webglAddonRef.current) return;
+					const addon = new webglMod.WebglAddon();
+					addon.onContextLoss(() => addon.dispose());
+					terminalRef.current.loadAddon(addon);
+					webglAddonRef.current = addon;
+				} catch {
+					// WebGL unavailable
+				}
+			})();
+		}
+	}, [minimized]);
 
 	return (
 		<div

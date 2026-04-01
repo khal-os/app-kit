@@ -31,6 +31,7 @@ export * from './components/theme-provider';
 export * from './components/theme-switcher';
 export * from './components/ticker-bar';
 export * from './components/tooltip';
+export { useWindowMinimized, WindowMinimizedProvider } from './components/window-minimized-context';
 // Hooks
 export { useReducedMotion } from './hooks/useReducedMotion';
 // Animations
