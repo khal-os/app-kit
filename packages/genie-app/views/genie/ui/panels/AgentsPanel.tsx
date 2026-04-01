@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SUBJECTS } from '../../../../lib/subjects';
 import { useNatsAction } from '../hooks/useNatsAction';
-import { useNatsRequest } from '../hooks/useNatsRequest';
+import { useNatsLive } from '../hooks/useNatsLive';
 
 // --- Types matching service responses ---
 
@@ -300,7 +300,10 @@ function AgentRow({
 // --- Main panel ---
 
 export function AgentsPanel() {
-	const { data, loading, error, refetch } = useNatsRequest<AgentsResponse>(SUBJECTS.agents.list(), undefined, 5000);
+	const { data, loading, error, refetch } = useNatsLive<AgentsResponse>({
+		requestSubject: SUBJECTS.agents.list(),
+		changeSubject: SUBJECTS.agents.changed(),
+	});
 
 	const killAction = useNatsAction(SUBJECTS.agent.kill());
 	const stopAction = useNatsAction(SUBJECTS.agent.stop());

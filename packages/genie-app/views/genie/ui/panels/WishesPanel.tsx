@@ -3,7 +3,7 @@
 import { useCallback, useState } from 'react';
 import { SUBJECTS } from '../../../../lib/subjects';
 import { useNatsAction } from '../hooks/useNatsAction';
-import { useNatsRequest } from '../hooks/useNatsRequest';
+import { useNatsLive } from '../hooks/useNatsLive';
 
 // --- Types matching service/wishes.ts responses ---
 
@@ -186,7 +186,12 @@ function WishDetail({
 	onReset: (ref: string) => void;
 	actionLoading: boolean;
 }) {
-	const { data, loading, error } = useNatsRequest<WishStatusResponse>(SUBJECTS.wish.status(), { slug }, 10000);
+	const { data, loading, error } = useNatsLive<WishStatusResponse>({
+		requestSubject: SUBJECTS.wish.status(),
+		changeSubject: SUBJECTS.wish.changed(),
+		payload: { slug },
+		usePushPayload: false,
+	});
 
 	if (loading) {
 		return <p className="text-xs text-[var(--os-text-secondary)] px-2 py-1">Loading groups...</p>;
@@ -231,7 +236,10 @@ function WishDetail({
 // --- Main panel ---
 
 export function WishesPanel() {
-	const { data, loading, error, refetch } = useNatsRequest<WishListResponse>(SUBJECTS.wish.list(), undefined, 5000);
+	const { data, loading, error, refetch } = useNatsLive<WishListResponse>({
+		requestSubject: SUBJECTS.wish.list(),
+		changeSubject: SUBJECTS.wish.changed(),
+	});
 
 	const { execute: execWork, loading: workLoading } = useNatsAction<ActionResponse>(SUBJECTS.wish.work());
 	const { execute: execDone, loading: doneLoading } = useNatsAction<ActionResponse>(SUBJECTS.wish.done());

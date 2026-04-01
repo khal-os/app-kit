@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SUBJECTS } from '../../../../lib/subjects';
 import { useNatsAction } from '../hooks/useNatsAction';
-import { useNatsRequest } from '../hooks/useNatsRequest';
+import { useNatsLive } from '../hooks/useNatsLive';
 
 // --- Types ---
 
@@ -37,11 +37,11 @@ type ChatTab = 'chat' | 'inbox';
 // --- Team Chat Tab ---
 
 function TeamChatTab() {
-	const { data, loading, error, refetch } = useNatsRequest<ChatReadResponse>(
-		SUBJECTS.comms.chat.read(),
-		undefined,
-		5000
-	);
+	const { data, loading, error, refetch } = useNatsLive<ChatReadResponse>({
+		requestSubject: SUBJECTS.comms.chat.read(),
+		changeSubject: SUBJECTS.comms.changed(),
+		usePushPayload: false,
+	});
 	const postAction = useNatsAction(SUBJECTS.comms.chat.post());
 	const [input, setInput] = useState('');
 	const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -142,7 +142,12 @@ function TeamChatTab() {
 function InboxTab() {
 	const [unreadOnly, setUnreadOnly] = useState(false);
 	const payload = useMemo(() => (unreadOnly ? { unread: true } : {}), [unreadOnly]);
-	const { data, loading, error, refetch } = useNatsRequest<InboxResponse>(SUBJECTS.comms.inbox(), payload, 5000);
+	const { data, loading, error, refetch } = useNatsLive<InboxResponse>({
+		requestSubject: SUBJECTS.comms.inbox(),
+		changeSubject: SUBJECTS.comms.changed(),
+		payload,
+		usePushPayload: false,
+	});
 
 	const messages = data?.messages ?? [];
 

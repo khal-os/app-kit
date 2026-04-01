@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { SUBJECTS } from '../../../../lib/subjects';
 import { useNatsAction } from '../hooks/useNatsAction';
+import { useNatsLive } from '../hooks/useNatsLive';
 import { useNatsRequest } from '../hooks/useNatsRequest';
 
 // --- Types matching service responses ---
@@ -479,7 +480,10 @@ function TeamRow({
 // --- Main TeamsPanel ---
 
 export function TeamsPanel() {
-	const { data, loading, error, refetch } = useNatsRequest<TeamsListResponse>(SUBJECTS.teams.list(), undefined, 5000);
+	const { data, loading, error, refetch } = useNatsLive<TeamsListResponse>({
+		requestSubject: SUBJECTS.teams.list(),
+		changeSubject: SUBJECTS.teams.changed(),
+	});
 
 	const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
 	const [showCreateDialog, setShowCreateDialog] = useState(false);

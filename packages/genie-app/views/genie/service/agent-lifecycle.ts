@@ -12,7 +12,7 @@ export const agentLifecycleHandlers: ServiceHandler[] = [
 	// --- Kill agent ---
 	{
 		subject: SUBJECTS.agent.kill(),
-		handler: (msg) => {
+		handler: (msg, nc) => {
 			try {
 				const { name } = msg.json<{ name: string }>();
 				if (!name) {
@@ -25,6 +25,8 @@ export const agentLifecycleHandlers: ServiceHandler[] = [
 					return;
 				}
 				msg.respond(JSON.stringify({ ok: true }));
+				// Notify agents changed — tmux watcher will follow with full state
+				nc.publish(SUBJECTS.agents.changed(), JSON.stringify({ ts: Date.now() }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err) }));
 			}
@@ -34,7 +36,7 @@ export const agentLifecycleHandlers: ServiceHandler[] = [
 	// --- Stop agent ---
 	{
 		subject: SUBJECTS.agent.stop(),
-		handler: (msg) => {
+		handler: (msg, nc) => {
 			try {
 				const { name } = msg.json<{ name: string }>();
 				if (!name) {
@@ -47,6 +49,8 @@ export const agentLifecycleHandlers: ServiceHandler[] = [
 					return;
 				}
 				msg.respond(JSON.stringify({ ok: true }));
+				// Notify agents changed — tmux watcher will follow with full state
+				nc.publish(SUBJECTS.agents.changed(), JSON.stringify({ ts: Date.now() }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err) }));
 			}

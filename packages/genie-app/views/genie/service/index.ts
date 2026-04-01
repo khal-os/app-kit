@@ -1,5 +1,6 @@
 import type { NatsConnection } from '@khal-os/sdk/service';
 import { createService } from '@khal-os/sdk/service';
+import { SUBJECTS } from '../../../lib/subjects';
 import { agentLifecycleHandlers } from './agent-lifecycle';
 import { appsHandlers, seedCoreApps } from './apps';
 import { runGenieAsync } from './cli';
@@ -43,6 +44,42 @@ function loadAgentRegistry(): Record<string, { name: string; color: string; stat
 	}
 }
 
+/**
+ * Build the full agents tree (sessions → windows → panes with registry data).
+ */
+function buildAgentsTree() {
+	const sessions = tmux.listSessions();
+	const windows = tmux.listWindows();
+	const panes = tmux.listPanes();
+	const registry = loadAgentRegistry();
+
+	return sessions.map((session) => ({
+		...session,
+		windows: windows
+			.filter((w) => w.sessionId === session.id)
+			.map((window) => ({
+				...window,
+				panes: panes
+					.filter((p) => p.windowId === window.id)
+					.map((pane) => ({ ...pane, agent: registry[pane.id] || null })),
+			})),
+	}));
+}
+
+/**
+ * Publish the current agents state to os.genie.agents.changed.
+ * Called after mutations (spawn, kill, stop) and by the tmux watcher.
+ */
+function publishAgentsChanged() {
+	if (!nc) return;
+	try {
+		const tree = buildAgentsTree();
+		nc.publish(SUBJECTS.agents.changed(), JSON.stringify({ sessions: tree, ts: Date.now() }));
+	} catch {
+		// Never let change event publishing break the service
+	}
+}
+
 createService({
 	name: 'genie-control',
 	onReady: async (_nc: NatsConnection) => {
@@ -56,6 +93,28 @@ createService({
 		} catch (err) {
 			console.error('[genie-control] seedCoreApps failed (continuing):', err);
 		}
+
+		// Tmux watcher: detect session/pane changes and publish agents.changed
+		let lastTmuxHash = '';
+		setInterval(() => {
+			try {
+				const sessions = tmux.listSessions();
+				const panes = tmux.listPanes();
+				const hash = `${sessions.length}:${sessions
+					.map((s) => s.id)
+					.sort()
+					.join(',')}:${panes.length}:${panes
+					.map((p) => p.id)
+					.sort()
+					.join(',')}`;
+				if (lastTmuxHash && hash !== lastTmuxHash) {
+					publishAgentsChanged();
+				}
+				lastTmuxHash = hash;
+			} catch {
+				// tmux not available — ignore
+			}
+		}, 3000);
 	},
 
 	onShutdown: () => {
@@ -68,23 +127,7 @@ createService({
 			subject: 'os.genie.agents.list',
 			handler: (msg) => {
 				try {
-					const sessions = tmux.listSessions();
-					const windows = tmux.listWindows();
-					const panes = tmux.listPanes();
-					const registry = loadAgentRegistry();
-
-					const tree = sessions.map((session) => ({
-						...session,
-						windows: windows
-							.filter((w) => w.sessionId === session.id)
-							.map((window) => ({
-								...window,
-								panes: panes
-									.filter((p) => p.windowId === window.id)
-									.map((pane) => ({ ...pane, agent: registry[pane.id] || null })),
-							})),
-					}));
-
+					const tree = buildAgentsTree();
 					msg.respond(JSON.stringify({ sessions: tree, ts: Date.now() }));
 				} catch (err) {
 					msg.respond(JSON.stringify({ error: String(err), sessions: [] }));
@@ -183,6 +226,8 @@ createService({
 						return;
 					}
 					msg.respond(JSON.stringify({ ok: true, output: result.data }));
+					// Agent spawned — publish agents.changed with full state
+					publishAgentsChanged();
 				} catch (err) {
 					msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 				}

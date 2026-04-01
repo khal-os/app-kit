@@ -4,6 +4,7 @@ export const SUBJECTS = {
 	// --- Existing: Agent listing & pane control ---
 	agents: {
 		list: () => `${PREFIX}.agents.list`,
+		changed: () => `${PREFIX}.agents.changed`,
 	},
 	sessions: {
 		list: () => `${PREFIX}.sessions.list`,
@@ -39,6 +40,7 @@ export const SUBJECTS = {
 		blocked: () => `${PREFIX}.teams.blocked`,
 		hire: () => `${PREFIX}.teams.hire`,
 		fire: () => `${PREFIX}.teams.fire`,
+		changed: () => `${PREFIX}.teams.changed`,
 	},
 
 	// --- Communication domain ---
@@ -46,6 +48,7 @@ export const SUBJECTS = {
 		send: () => `${PREFIX}.comms.send`,
 		broadcast: () => `${PREFIX}.comms.broadcast`,
 		inbox: () => `${PREFIX}.comms.inbox`,
+		changed: () => `${PREFIX}.comms.changed`,
 		chat: {
 			post: () => `${PREFIX}.comms.chat.post`,
 			read: () => `${PREFIX}.comms.chat.read`,
@@ -59,6 +62,7 @@ export const SUBJECTS = {
 		work: () => `${PREFIX}.wish.work`,
 		done: () => `${PREFIX}.wish.done`,
 		reset: () => `${PREFIX}.wish.reset`,
+		changed: () => `${PREFIX}.wish.changed`,
 	},
 
 	// --- Agent lifecycle domain ---

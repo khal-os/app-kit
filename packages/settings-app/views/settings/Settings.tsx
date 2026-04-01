@@ -337,7 +337,7 @@ function ServicesTab() {
 	const [logLines, setLogLines] = useState<string[]>([]);
 	const [loading, setLoading] = useState(true);
 
-	// Fetch service list
+	// One-shot fetch + subscribe to change events (no polling)
 	useEffect(() => {
 		if (!connected) return;
 		const fetchServices = async () => {
@@ -351,9 +351,15 @@ function ServicesTab() {
 			}
 		};
 		fetchServices();
-		const interval = setInterval(fetchServices, 10_000);
-		return () => clearInterval(interval);
-	}, [connected, request, orgId]);
+		const unsub = subscribe('khal._internal.services.changed', (data) => {
+			const payload = data as { services?: ServiceInfo[] };
+			if (payload.services) {
+				setServices(payload.services);
+				setLoading(false);
+			}
+		});
+		return unsub;
+	}, [connected, request, subscribe, orgId]);
 
 	// Subscribe to live logs for selected service
 	useEffect(() => {
