@@ -1,5 +1,6 @@
 'use client';
-import { type ComponentType, lazy } from 'react';
+import type { ComponentType } from 'react';
+import { Console } from './views/console/Console';
 
 interface AppComponentProps {
 	windowId: string;
@@ -7,5 +8,5 @@ interface AppComponentProps {
 }
 
 export const components: Record<string, ComponentType<AppComponentProps>> = {
-	console: lazy(() => import('./views/console/Console').then((m) => ({ default: m.Console }))),
+	console: Console,
 };
