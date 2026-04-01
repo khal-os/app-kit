@@ -240,12 +240,28 @@ export function WorkspaceCanvas(_props: { windowId: string; meta?: Record<string
 		}
 	}, []);
 
-	// Polling
+	// Polling — pauses when tab is hidden to save CPU/network
 	useEffect(() => {
 		fetchData();
 		intervalRef.current = setInterval(fetchData, 5000);
+
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === 'hidden') {
+				if (intervalRef.current) {
+					clearInterval(intervalRef.current);
+					intervalRef.current = null;
+				}
+			} else {
+				fetchData();
+				intervalRef.current = setInterval(fetchData, 5000);
+			}
+		};
+
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+
 		return () => {
 			if (intervalRef.current) clearInterval(intervalRef.current);
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
 		};
 	}, [fetchData]);
 

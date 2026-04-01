@@ -231,23 +231,27 @@ export function TerminalPane({
 				const bytes = decodeBase64(data);
 				terminal.write(bytes);
 
-				// For new sessions, load WebGL after first data
+				// For new sessions, load WebGL after first data (only if GPU setting enabled)
 				if (response.created && !bufferReplayedRef.current) {
 					bufferReplayedRef.current = true;
-					(async () => {
-						try {
-							const webglMod = await import('@xterm/addon-webgl');
-							if (cancelled || !terminalRef.current) return;
-							const webglAddon = new webglMod.WebglAddon();
-							webglAddon.onContextLoss(() => {
-								webglAddon.dispose();
-							});
-							terminal.loadAddon(webglAddon);
-							webglAddonRef.current = webglAddon;
-						} catch {
-							// WebGL not available
-						}
-					})();
+					const gpuEnabled =
+						typeof localStorage !== 'undefined' && localStorage.getItem('khal-gpu-terminals') === 'true';
+					if (gpuEnabled) {
+						(async () => {
+							try {
+								const webglMod = await import('@xterm/addon-webgl');
+								if (cancelled || !terminalRef.current) return;
+								const webglAddon = new webglMod.WebglAddon();
+								webglAddon.onContextLoss(() => {
+									webglAddon.dispose();
+								});
+								terminal.loadAddon(webglAddon);
+								webglAddonRef.current = webglAddon;
+							} catch {
+								// WebGL not available
+							}
+						})();
+					}
 				}
 			});
 			unsubsRef.current.push(unsubData);
@@ -291,21 +295,25 @@ export function TerminalPane({
 						}, 150);
 					}
 
-					// Load WebGL addon after buffer replay
-					(async () => {
-						try {
-							const webglMod = await import('@xterm/addon-webgl');
-							if (cancelled || !terminalRef.current) return;
-							const webglAddon = new webglMod.WebglAddon();
-							webglAddon.onContextLoss(() => {
-								webglAddon.dispose();
-							});
-							terminal.loadAddon(webglAddon);
-							webglAddonRef.current = webglAddon;
-						} catch {
-							// WebGL not available
-						}
-					})();
+					// Load WebGL addon after buffer replay (only if GPU setting enabled)
+					const gpuEnabledReplay =
+						typeof localStorage !== 'undefined' && localStorage.getItem('khal-gpu-terminals') === 'true';
+					if (gpuEnabledReplay) {
+						(async () => {
+							try {
+								const webglMod = await import('@xterm/addon-webgl');
+								if (cancelled || !terminalRef.current) return;
+								const webglAddon = new webglMod.WebglAddon();
+								webglAddon.onContextLoss(() => {
+									webglAddon.dispose();
+								});
+								terminal.loadAddon(webglAddon);
+								webglAddonRef.current = webglAddon;
+							} catch {
+								// WebGL not available
+							}
+						})();
+					}
 				});
 				unsubsRef.current.push(unsubBufferEnd);
 

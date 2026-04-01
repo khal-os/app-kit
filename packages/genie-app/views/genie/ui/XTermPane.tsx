@@ -192,6 +192,9 @@ export function XTermPane({ tmuxPaneId, onDisconnect }: XTermPaneProps) {
 
 			const unsubBufferEnd = client.subscribe(SUBJECTS.term.bufferEnd(sessionId), () => {
 				if (isCancelled) return;
+				// Only load WebGL addon if GPU terminals setting is enabled (canvas2d by default)
+				const gpuEnabled = typeof localStorage !== 'undefined' && localStorage.getItem('khal-gpu-terminals') === 'true';
+				if (!gpuEnabled) return;
 				(async () => {
 					try {
 						const webglMod = await import('@xterm/addon-webgl');
