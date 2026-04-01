@@ -512,6 +512,11 @@ export const appsHandlers: ServiceHandler[] = [
 					return;
 				}
 
+				if (CORE_APP_SLUGS.has(req.slug)) {
+					msg.respond(JSON.stringify({ ok: false, error: 'Core apps cannot be uninstalled' }));
+					return;
+				}
+
 				// Check if this is a stack — if so, uninstall all contained items first
 				let stackItemsRemoved = 0;
 				const [storeRow] = await db()
@@ -640,6 +645,7 @@ export const appsHandlers: ServiceHandler[] = [
 				const items = rows.map((r) => ({
 					...r.store,
 					installed: r.installedSlug !== null,
+					core: CORE_APP_SLUGS.has(r.store.slug),
 				}));
 
 				msg.respond(JSON.stringify({ items }));
