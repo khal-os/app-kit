@@ -14,15 +14,20 @@ export * from './components/ContextMenu';
 export * from './components/command';
 // Design system components — local implementations
 export * from './components/cost-counter';
+// Design system components — LP section patterns
+export * from './components/data-row';
 export * from './components/dropdown-menu';
 export * from './components/glass-card';
 export * from './components/input';
 export * from './components/khal-logo';
 export * from './components/live-feed';
 export * from './components/mesh-gradient';
+export * from './components/metric-display';
 export * from './components/note';
 export * from './components/number-flow';
+export * from './components/pill-badge';
 export * from './components/progress-bar';
+export * from './components/section-card';
 export * from './components/separator';
 export * from './components/spinner';
 export * from './components/status-dot';

@@ -65,7 +65,7 @@ export function Settings(_props: { windowId: string; meta?: Record<string, unkno
 				</SplitPane>
 			</div>
 			<StatusBar>
-				<StatusBar.Item>Khal OS</StatusBar.Item>
+				<StatusBar.Item>khal</StatusBar.Item>
 				<StatusBar.Spacer />
 				<StatusBar.Item variant="success">local</StatusBar.Item>
 			</StatusBar>
@@ -223,7 +223,7 @@ function AboutTab() {
 	return (
 		<div className="flex max-w-2xl flex-col gap-8 text-gray-1000">
 			<section>
-				<SectionHeader title="Khal OS" description="Desktop-in-browser OS shell." />
+				<SectionHeader title="khal" description="Desktop-in-browser OS shell." />
 				<PropertyPanel className="rounded-lg border border-gray-alpha-200">
 					<PropertyPanel.Section>
 						<PropertyPanel.Row label="Version">v2-dev</PropertyPanel.Row>
@@ -523,7 +523,7 @@ function AppsTab() {
 			<section>
 				<SectionHeader
 					title="Installed Apps"
-					description="Apps registered in Khal OS. Export standalone desktop binaries via Tauri."
+					description="Apps registered in khal. Export standalone desktop binaries via Tauri."
 				/>
 				<div className="rounded-lg border border-gray-alpha-200 bg-background-100">
 					{apps.length === 0 && <div className="p-4 text-center text-copy-13 text-gray-700">No apps detected.</div>}

@@ -27,14 +27,14 @@ export function TerminalTabBar({ tabs, activeTabId, onTabClick, onTabClose, onNe
 		return tab.title || 'bash';
 	};
 
-	// Reserve space for the floating window controls (glass controls on the right)
-	const prControls = '100px';
+	// Reserve space for the floating traffic-light controls on the left
+	const plControls = '80px';
 
 	return (
 		<div
 			className="terminal-tab-bar flex items-center gap-1 px-2 py-1.5"
 			style={{
-				paddingRight: prControls,
+				paddingLeft: plControls,
 				minHeight: '36px',
 			}}
 		>
