@@ -41,5 +41,7 @@ export type { DesktopNotification, DesktopNotifMode, NotificationUrgency, TrayIc
 // Stores (OS-level state)
 export { useNotificationStore } from './stores/notification-store';
 export { useThemeStore } from './stores/theme-store';
+// LP Design Tokens
+export * from './tokens/lp-tokens';
 // Utilities
 export { cn } from './utils';
