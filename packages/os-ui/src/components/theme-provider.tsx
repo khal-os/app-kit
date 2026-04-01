@@ -14,10 +14,44 @@ function ReduceMotionSync() {
 	return null;
 }
 
+function GlassSync() {
+	const glassEnabled = useThemeStore((s) => s.glassEnabled);
+
+	useEffect(() => {
+		const el = document.documentElement;
+		if (glassEnabled) {
+			el.setAttribute('data-glass', '');
+			el.style.setProperty('--khal-glass-enabled', '1');
+		} else {
+			el.removeAttribute('data-glass');
+			el.style.setProperty('--khal-glass-enabled', '0');
+		}
+	}, [glassEnabled]);
+
+	return null;
+}
+
+function GpuTerminalsSync() {
+	const gpuTerminals = useThemeStore((s) => s.gpuTerminals);
+
+	useEffect(() => {
+		// Sync to the localStorage key the terminal reads on mount
+		if (gpuTerminals) {
+			localStorage.setItem('khal-gpu-terminals', 'true');
+		} else {
+			localStorage.removeItem('khal-gpu-terminals');
+		}
+	}, [gpuTerminals]);
+
+	return null;
+}
+
 export function ThemeProvider({ children, ...props }: React.ComponentProps<typeof NextThemesProvider>) {
 	return (
 		<NextThemesProvider {...props}>
 			<ReduceMotionSync />
+			<GlassSync />
+			<GpuTerminalsSync />
 			{children}
 		</NextThemesProvider>
 	);

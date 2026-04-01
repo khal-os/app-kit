@@ -17,6 +17,7 @@ export * from './components/cost-counter';
 export * from './components/dropdown-menu';
 export * from './components/glass-card';
 export * from './components/input';
+export * from './components/khal-logo';
 export * from './components/live-feed';
 export * from './components/mesh-gradient';
 export * from './components/note';
@@ -30,6 +31,7 @@ export * from './components/theme-provider';
 export * from './components/theme-switcher';
 export * from './components/ticker-bar';
 export * from './components/tooltip';
+export { useWindowMinimized, WindowMinimizedProvider } from './components/window-minimized-context';
 // Hooks
 export { useReducedMotion } from './hooks/useReducedMotion';
 // Animations
@@ -40,5 +42,7 @@ export type { DesktopNotification, DesktopNotifMode, NotificationUrgency, TrayIc
 // Stores (OS-level state)
 export { useNotificationStore } from './stores/notification-store';
 export { useThemeStore } from './stores/theme-store';
+// LP Design Tokens
+export * from './tokens/lp-tokens';
 // Utilities
 export { cn } from './utils';

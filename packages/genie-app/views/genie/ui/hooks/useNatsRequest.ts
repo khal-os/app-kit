@@ -61,12 +61,29 @@ export function useNatsRequest<T = unknown>(
 			intervalRef.current = setInterval(fetchData, interval);
 		}
 
+		// Pause polling when tab is hidden, resume when visible
+		const handleVisibilityChange = () => {
+			if (interval <= 0) return;
+			if (document.visibilityState === 'hidden') {
+				if (intervalRef.current) {
+					clearInterval(intervalRef.current);
+					intervalRef.current = null;
+				}
+			} else {
+				fetchData();
+				intervalRef.current = setInterval(fetchData, interval);
+			}
+		};
+
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+
 		return () => {
 			mountedRef.current = false;
 			if (intervalRef.current) {
 				clearInterval(intervalRef.current);
 				intervalRef.current = null;
 			}
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
 		};
 	}, [fetchData, interval]);
 

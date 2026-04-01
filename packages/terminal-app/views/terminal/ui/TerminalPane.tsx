@@ -1,7 +1,7 @@
 'use client';
 
 import { SUBJECTS, useNats } from '@khal-os/sdk/app';
-import { useThemeStore } from '@khal-os/ui';
+import { useThemeStore, useWindowMinimized } from '@khal-os/ui';
 import type { FitAddon } from '@xterm/addon-fit';
 import type { WebglAddon } from '@xterm/addon-webgl';
 import type { Terminal } from '@xterm/xterm';
@@ -81,6 +81,7 @@ export function TerminalPane({
 	onCwdChange,
 	onLastCommandChange,
 }: TerminalPaneProps) {
+	const minimized = useWindowMinimized();
 	const containerRef = useRef<HTMLDivElement>(null);
 	const terminalRef = useRef<Terminal | null>(null);
 	const fitAddonRef = useRef<FitAddon | null>(null);
@@ -231,23 +232,27 @@ export function TerminalPane({
 				const bytes = decodeBase64(data);
 				terminal.write(bytes);
 
-				// For new sessions, load WebGL after first data
+				// For new sessions, load WebGL after first data (only if GPU setting enabled)
 				if (response.created && !bufferReplayedRef.current) {
 					bufferReplayedRef.current = true;
-					(async () => {
-						try {
-							const webglMod = await import('@xterm/addon-webgl');
-							if (cancelled || !terminalRef.current) return;
-							const webglAddon = new webglMod.WebglAddon();
-							webglAddon.onContextLoss(() => {
-								webglAddon.dispose();
-							});
-							terminal.loadAddon(webglAddon);
-							webglAddonRef.current = webglAddon;
-						} catch {
-							// WebGL not available
-						}
-					})();
+					const gpuEnabled =
+						typeof localStorage !== 'undefined' && localStorage.getItem('khal-gpu-terminals') === 'true';
+					if (gpuEnabled) {
+						(async () => {
+							try {
+								const webglMod = await import('@xterm/addon-webgl');
+								if (cancelled || !terminalRef.current) return;
+								const webglAddon = new webglMod.WebglAddon();
+								webglAddon.onContextLoss(() => {
+									webglAddon.dispose();
+								});
+								terminal.loadAddon(webglAddon);
+								webglAddonRef.current = webglAddon;
+							} catch {
+								// WebGL not available
+							}
+						})();
+					}
 				}
 			});
 			unsubsRef.current.push(unsubData);
@@ -291,21 +296,25 @@ export function TerminalPane({
 						}, 150);
 					}
 
-					// Load WebGL addon after buffer replay
-					(async () => {
-						try {
-							const webglMod = await import('@xterm/addon-webgl');
-							if (cancelled || !terminalRef.current) return;
-							const webglAddon = new webglMod.WebglAddon();
-							webglAddon.onContextLoss(() => {
-								webglAddon.dispose();
-							});
-							terminal.loadAddon(webglAddon);
-							webglAddonRef.current = webglAddon;
-						} catch {
-							// WebGL not available
-						}
-					})();
+					// Load WebGL addon after buffer replay (only if GPU setting enabled)
+					const gpuEnabledReplay =
+						typeof localStorage !== 'undefined' && localStorage.getItem('khal-gpu-terminals') === 'true';
+					if (gpuEnabledReplay) {
+						(async () => {
+							try {
+								const webglMod = await import('@xterm/addon-webgl');
+								if (cancelled || !terminalRef.current) return;
+								const webglAddon = new webglMod.WebglAddon();
+								webglAddon.onContextLoss(() => {
+									webglAddon.dispose();
+								});
+								terminal.loadAddon(webglAddon);
+								webglAddonRef.current = webglAddon;
+							} catch {
+								// WebGL not available
+							}
+						})();
+					}
 				});
 				unsubsRef.current.push(unsubBufferEnd);
 
@@ -461,6 +470,38 @@ export function TerminalPane({
 			observer.disconnect();
 		};
 	}, []);
+
+	// Dispose WebGL on minimize, re-attach on restore (saves GPU contexts)
+	useEffect(() => {
+		if (minimized) {
+			if (webglAddonRef.current) {
+				try {
+					webglAddonRef.current.dispose();
+				} catch {
+					// ignore
+				}
+				webglAddonRef.current = null;
+			}
+		} else {
+			// Restore: re-attach WebGL if GPU setting is enabled and terminal exists
+			const terminal = terminalRef.current;
+			if (!terminal || webglAddonRef.current) return;
+			const gpuEnabled = typeof localStorage !== 'undefined' && localStorage.getItem('khal-gpu-terminals') === 'true';
+			if (!gpuEnabled) return;
+			(async () => {
+				try {
+					const webglMod = await import('@xterm/addon-webgl');
+					if (!terminalRef.current || webglAddonRef.current) return;
+					const addon = new webglMod.WebglAddon();
+					addon.onContextLoss(() => addon.dispose());
+					terminalRef.current.loadAddon(addon);
+					webglAddonRef.current = addon;
+				} catch {
+					// WebGL unavailable
+				}
+			})();
+		}
+	}, [minimized]);
 
 	return (
 		<div
