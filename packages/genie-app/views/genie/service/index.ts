@@ -2,7 +2,7 @@ import type { NatsConnection } from '@khal-os/sdk/service';
 import { createService } from '@khal-os/sdk/service';
 import { SUBJECTS } from '../../../lib/subjects';
 import { agentLifecycleHandlers } from './agent-lifecycle';
-import { appsHandlers, seedCoreApps } from './apps';
+import { appsHandlers, seedCoreApps, setAppsNc } from './apps';
 import { runGenieAsync } from './cli';
 import { commsHandlers } from './comms';
 import { directorySubscriptions } from './directory';
@@ -84,6 +84,7 @@ createService({
 	name: 'genie-control',
 	onReady: async (_nc: NatsConnection) => {
 		nc = _nc;
+		setAppsNc(nc);
 		tmux = new TmuxControl();
 		termProxy = createTerminalProxy(nc, tmux);
 

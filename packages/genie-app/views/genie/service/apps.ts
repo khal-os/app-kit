@@ -19,8 +19,26 @@ import { getDatabaseUrl } from '@khal-os/sdk/config';
 import { getDb, initDb, isDbInitialized } from '@khal-os/sdk/db';
 import { and, avg, count, eq, inArray, sql } from '@khal-os/sdk/db/operators';
 import * as schema from '@khal-os/sdk/db/schema';
-import type { ServiceHandler } from '@khal-os/sdk/service';
+import type { NatsConnection, ServiceHandler } from '@khal-os/sdk/service';
 import { SUBJECTS } from '../../../lib/subjects';
+
+/** Module-level NATS connection for publishing events from handlers. */
+let _nc: NatsConnection | null = null;
+
+/** Set the NATS connection — called from index.ts onReady. */
+export function setAppsNc(nc: NatsConnection): void {
+	_nc = nc;
+}
+
+/** Publish khal._internal.apps.changed so the desktop refreshes in real-time. */
+function publishAppsChanged(): void {
+	if (!_nc) return;
+	try {
+		_nc.publish('khal._internal.apps.changed', JSON.stringify({ ts: Date.now() }));
+	} catch {
+		// Never let event publishing break the handler
+	}
+}
 
 /** Ensure DB is initialized before first use. */
 function db() {
@@ -70,6 +88,9 @@ async function resolveAppId(appIdOrSlug: string): Promise<string> {
 	return rows.length > 0 ? rows[0].id : appIdOrSlug;
 }
 
+/** Apps that get auto-installed on fresh boot. Everything else is store-only. */
+const CORE_APP_SLUGS = new Set(['terminal', 'files', 'settings', 'marketplace']);
+
 /** Mission Control manifest — hardcoded since it has no package with manifest.ts. */
 const MISSION_CONTROL_MANIFEST = {
 	id: 'mission-control',
@@ -87,6 +108,27 @@ const MISSION_CONTROL_MANIFEST = {
 		icon: '/icons/dusk/mission_control.svg',
 		categories: ['System'],
 		comment: 'See all your tasks flow through stages',
+	},
+};
+
+/** Marketplace manifest — hardcoded since it's a core UI component, not a package. */
+const MARKETPLACE_MANIFEST = {
+	id: 'marketplace',
+	views: [
+		{
+			id: 'marketplace',
+			label: 'App Store',
+			permission: 'marketplace',
+			minRole: 'member',
+			natsPrefix: 'apps',
+			defaultSize: { width: 1000, height: 700 },
+			fullSizeContent: true,
+		},
+	],
+	desktop: {
+		icon: '/icons/dusk/app_store.svg',
+		categories: ['System'],
+		comment: 'Browse and install apps',
 	},
 };
 
@@ -142,13 +184,18 @@ export async function seedCoreApps(): Promise<void> {
 		}
 	}
 
-	// Add mission-control (no package, hardcoded manifest)
+	// Add hardcoded manifests (no packages with manifest.ts)
 	manifests.push({
 		manifest: MISSION_CONTROL_MANIFEST,
 		pkgDir: resolve(packagesDir, 'mission-control'),
 	});
+	manifests.push({
+		manifest: MARKETPLACE_MANIFEST,
+		pkgDir: resolve(packagesDir, 'marketplace'),
+	});
 
-	// Upsert each manifest's primary view into app_store + installed_apps
+	// Upsert each manifest's primary view into app_store.
+	// Only CORE_APP_SLUGS also get inserted into installed_apps.
 	for (const { manifest, pkgDir } of manifests) {
 		const view = manifest.views[0];
 		if (!view) continue;
@@ -191,24 +238,29 @@ export async function seedCoreApps(): Promise<void> {
 				})
 				.returning();
 
-			await db()
-				.insert(schema.installedApps)
-				.values({
-					appId: storeEntry.id,
-					slug: view.id,
-					path: pkgDir,
-					status: 'installed',
-				})
-				.onConflictDoUpdate({
-					target: schema.installedApps.slug,
-					set: {
+			// Only auto-install core apps; others remain store-only
+			if (CORE_APP_SLUGS.has(view.id)) {
+				await db()
+					.insert(schema.installedApps)
+					.values({
 						appId: storeEntry.id,
+						slug: view.id,
 						path: pkgDir,
 						status: 'installed',
-					},
-				});
+					})
+					.onConflictDoUpdate({
+						target: schema.installedApps.slug,
+						set: {
+							appId: storeEntry.id,
+							path: pkgDir,
+							status: 'installed',
+						},
+					});
 
-			console.log(`[apps-service] seeded core app: ${view.id}`);
+				console.log(`[apps-service] seeded core app: ${view.id}`);
+			} else {
+				console.log(`[apps-service] seeded store app: ${view.id} (not auto-installed)`);
+			}
 		} catch (err) {
 			console.warn(`[apps-service] failed to seed ${view.id}:`, err);
 		}
@@ -441,6 +493,7 @@ export const appsHandlers: ServiceHandler[] = [
 					details: { path: req.path, version: req.version, stackItems },
 				});
 
+				publishAppsChanged();
 				msg.respond(JSON.stringify({ ok: true, storeEntry, installed, stackItems }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
@@ -489,6 +542,7 @@ export const appsHandlers: ServiceHandler[] = [
 					details: { removed: deleted.length, stackItemsRemoved },
 				});
 
+				publishAppsChanged();
 				msg.respond(JSON.stringify({ ok: true, removed: deleted.length, stackItemsRemoved }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
