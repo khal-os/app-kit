@@ -32,6 +32,8 @@ export { DockerRuntime } from './docker';
 // Factory
 export { createRuntime, detectBestRuntime } from './factory';
 export { FirecrackerRuntime } from './firecracker';
+export type { KubernetesRuntimeConfig } from './kubernetes';
+export { KubernetesRuntime } from './kubernetes';
 // Concrete implementations
 export { LocalRuntime } from './local';
 export { OCIRuntime } from './oci';

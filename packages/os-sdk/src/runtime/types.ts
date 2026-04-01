@@ -9,7 +9,16 @@
 // Runtime type discriminator
 // ---------------------------------------------------------------------------
 
-export type RuntimeType = 'local' | 'remote' | 'vercel' | 'firecracker' | 'docker' | 'aws' | 'azure' | 'oci';
+export type RuntimeType =
+	| 'local'
+	| 'remote'
+	| 'vercel'
+	| 'firecracker'
+	| 'docker'
+	| 'kubernetes'
+	| 'aws'
+	| 'azure'
+	| 'oci';
 
 // ---------------------------------------------------------------------------
 // Configuration
