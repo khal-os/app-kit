@@ -17,6 +17,7 @@ export * from './components/cost-counter';
 export * from './components/dropdown-menu';
 export * from './components/glass-card';
 export * from './components/input';
+export * from './components/khal-logo';
 export * from './components/live-feed';
 export * from './components/mesh-gradient';
 export * from './components/note';
