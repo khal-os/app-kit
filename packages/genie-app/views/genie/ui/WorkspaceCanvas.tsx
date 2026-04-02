@@ -5,8 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Layout } from 'react-grid-layout';
 import RGL, { WidthProvider } from 'react-grid-layout';
 import 'react-grid-layout/css/styles.css';
-import { getNatsClient } from '@/lib/nats-client';
 import { SUBJECTS } from '../../../lib/subjects';
+import { useNatsLive } from './hooks/useNatsLive';
 import { PaneCard } from './PaneCard';
 import { Sidebar } from './Sidebar';
 import { type SessionTab, TabBar } from './TabBar';
@@ -135,7 +135,7 @@ function Canvas({
 	const prevPaneKeyRef = useRef(paneIdKey(panes));
 	const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-	// Recompute layout only when pane set changes (add/remove), not on every poll
+	// Recompute layout only when pane set changes (add/remove)
 	useEffect(() => {
 		const key = paneIdKey(panes);
 		if (key === prevPaneKeyRef.current) return;
@@ -215,39 +215,15 @@ function Canvas({
 // --- Main Component ---
 
 export function WorkspaceCanvas(_props: { windowId: string; meta?: Record<string, unknown> }) {
-	const [sessions, setSessions] = useState<SessionData[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
+	const { data, loading, error, refetch } = useNatsLive<AgentsResponse>({
+		requestSubject: SUBJECTS.agents.list(),
+		changeSubject: SUBJECTS.agents.changed(),
+		usePushPayload: false,
+	});
+	const sessions = data?.sessions ?? [];
+	const displayError = error || data?.error || null;
 	const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-	const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const resetLayoutRef = useRef<(() => void) | null>(null);
-
-	const fetchData = useCallback(async () => {
-		try {
-			const client = getNatsClient();
-			const response = await client.request(SUBJECTS.agents.list(), {}, 5000);
-			const data = response as AgentsResponse;
-			if (data.error) {
-				setError(data.error);
-				return;
-			}
-			setSessions(data.sessions || []);
-			setError(null);
-		} catch (err) {
-			setError(String(err));
-		} finally {
-			setLoading(false);
-		}
-	}, []);
-
-	// Polling
-	useEffect(() => {
-		fetchData();
-		intervalRef.current = setInterval(fetchData, 5000);
-		return () => {
-			if (intervalRef.current) clearInterval(intervalRef.current);
-		};
-	}, [fetchData]);
 
 	// Auto-select first session if none selected or current selection is gone
 	useEffect(() => {
@@ -296,11 +272,11 @@ export function WorkspaceCanvas(_props: { windowId: string; meta?: Record<string
 				<p className="text-sm text-[var(--os-text-secondary)]">Connecting to tmux...</p>
 			</div>
 		);
-	} else if (error) {
+	} else if (displayError) {
 		content = (
 			<div className="flex h-full flex-col items-center justify-center gap-2">
-				<p className="text-sm text-red-400">Error: {error}</p>
-				<button type="button" onClick={fetchData} className="rounded bg-white/10 px-3 py-1 text-xs hover:bg-white/20">
+				<p className="text-sm text-red-400">Error: {displayError}</p>
+				<button type="button" onClick={refetch} className="rounded bg-white/10 px-3 py-1 text-xs hover:bg-white/20">
 					Retry
 				</button>
 			</div>

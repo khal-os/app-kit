@@ -1,0 +1,76 @@
+{
+	"initial_node": "greeting",
+	"nodes": [
+		{
+			"id": "greeting",
+			"data": {
+				"task_messages": [
+					{
+						"role": "system",
+						"content": "Greet the caller warmly in Portuguese. Ask how you can help them today."
+					}
+				],
+				"functions": [
+					{
+						"name": "route_to_support",
+						"description": "Route caller to technical support",
+						"transition_to": "support"
+					},
+					{
+						"name": "route_to_sales",
+						"description": "Route caller to sales",
+						"transition_to": "sales"
+					}
+				]
+			}
+		},
+		{
+			"id": "support",
+			"data": {
+				"task_messages": [
+					{
+						"role": "system",
+						"content": "You are now handling a technical support request. Ask for the issue details and try to help."
+					}
+				],
+				"functions": [
+					{
+						"name": "end_conversation",
+						"description": "End the support conversation",
+						"transition_to": "farewell"
+					}
+				]
+			}
+		},
+		{
+			"id": "sales",
+			"data": {
+				"task_messages": [
+					{
+						"role": "system",
+						"content": "You are now handling a sales inquiry. Present the available plans and pricing."
+					}
+				],
+				"functions": [
+					{
+						"name": "end_conversation",
+						"description": "End the sales conversation",
+						"transition_to": "farewell"
+					}
+				]
+			}
+		},
+		{
+			"id": "farewell",
+			"data": {
+				"task_messages": [
+					{
+						"role": "system",
+						"content": "Thank the caller and say goodbye warmly in Portuguese."
+					}
+				],
+				"functions": []
+			}
+		}
+	]
+}

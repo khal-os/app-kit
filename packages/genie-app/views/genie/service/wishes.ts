@@ -11,6 +11,7 @@
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import type { NatsConnection } from '@khal-os/sdk/service';
 import { SUBJECTS } from '../../../lib/subjects';
 import { runGenie, runGenieAsync } from './cli';
 
@@ -157,6 +158,17 @@ function listWishes(): WishEntry[] {
 	return wishes;
 }
 
+/**
+ * Publish full wish list to os.genie.wish.changed.
+ */
+function publishWishChanged(nc: NatsConnection): void {
+	try {
+		nc.publish(SUBJECTS.wish.changed(), JSON.stringify({ wishes: listWishes(), ts: Date.now() }));
+	} catch {
+		// Never let change event publishing break the service
+	}
+}
+
 export const wishHandlers = [
 	// --- List all wishes ---
 	{
@@ -199,7 +211,10 @@ export const wishHandlers = [
 	// --- Trigger work execution (async — spawns agents) ---
 	{
 		subject: SUBJECTS.wish.work(),
-		handler: async (msg: { data: Uint8Array; json: <T>() => T; respond: (data: string) => void }) => {
+		handler: async (
+			msg: { data: Uint8Array; json: <T>() => T; respond: (data: string) => void },
+			nc: NatsConnection
+		) => {
 			try {
 				const req = msg.json<{ ref: string; agent?: string }>();
 				if (!req.ref) {
@@ -216,6 +231,7 @@ export const wishHandlers = [
 					return;
 				}
 				msg.respond(JSON.stringify({ ok: true, output: result.data }));
+				publishWishChanged(nc);
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 			}
@@ -225,7 +241,7 @@ export const wishHandlers = [
 	// --- Mark wish/group as done ---
 	{
 		subject: SUBJECTS.wish.done(),
-		handler: (msg: { data: Uint8Array; json: <T>() => T; respond: (data: string) => void }) => {
+		handler: (msg: { data: Uint8Array; json: <T>() => T; respond: (data: string) => void }, nc: NatsConnection) => {
 			try {
 				const req = msg.json<{ ref: string }>();
 				if (!req.ref) {
@@ -239,6 +255,7 @@ export const wishHandlers = [
 					return;
 				}
 				msg.respond(JSON.stringify({ ok: true }));
+				publishWishChanged(nc);
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 			}
@@ -248,7 +265,7 @@ export const wishHandlers = [
 	// --- Reset wish/group ---
 	{
 		subject: SUBJECTS.wish.reset(),
-		handler: (msg: { data: Uint8Array; json: <T>() => T; respond: (data: string) => void }) => {
+		handler: (msg: { data: Uint8Array; json: <T>() => T; respond: (data: string) => void }, nc: NatsConnection) => {
 			try {
 				const req = msg.json<{ ref: string }>();
 				if (!req.ref) {
@@ -262,6 +279,7 @@ export const wishHandlers = [
 					return;
 				}
 				msg.respond(JSON.stringify({ ok: true }));
+				publishWishChanged(nc);
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 			}

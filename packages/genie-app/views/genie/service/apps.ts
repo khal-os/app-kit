@@ -6,6 +6,8 @@
  *   os.genie.apps.get           — get single app by slug
  *   os.genie.apps.register      — register app (upsert store + install)
  *   os.genie.apps.unregister    — uninstall app (delete from installed_apps)
+ *   os.genie.apps.disable       — disable app (kill service, keep data)
+ *   os.genie.apps.enable        — re-enable a disabled app
  *   os.genie.apps.store.list    — list approved apps in the store
  *   os.genie.apps.store.submit  — submit app for review
  *   os.genie.apps.store.approve — approve a submitted app
@@ -13,11 +15,30 @@
 
 import { existsSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { getDatabaseUrl, getDb, initDb, isDbInitialized } from '@khal-os/sdk';
-import { eq } from '@khal-os/sdk/db/operators';
+import { getDatabaseUrl } from '@khal-os/sdk/config';
+import { getDb, initDb, isDbInitialized } from '@khal-os/sdk/db';
+import { and, avg, count, eq, inArray, sql } from '@khal-os/sdk/db/operators';
 import * as schema from '@khal-os/sdk/db/schema';
-import type { ServiceHandler } from '@khal-os/sdk/service';
+import type { NatsConnection, ServiceHandler } from '@khal-os/sdk/service';
 import { SUBJECTS } from '../../../lib/subjects';
+
+/** Module-level NATS connection for publishing events from handlers. */
+let _nc: NatsConnection | null = null;
+
+/** Set the NATS connection — called from index.ts onReady. */
+export function setAppsNc(nc: NatsConnection): void {
+	_nc = nc;
+}
+
+/** Publish khal._internal.apps.changed so the desktop refreshes in real-time. */
+function publishAppsChanged(): void {
+	if (!_nc) return;
+	try {
+		_nc.publish('khal._internal.apps.changed', JSON.stringify({ ts: Date.now() }));
+	} catch {
+		// Never let event publishing break the handler
+	}
+}
 
 /** Ensure DB is initialized before first use. */
 function db() {
@@ -26,6 +47,49 @@ function db() {
 	}
 	return getDb();
 }
+
+/**
+ * Record an audit event for security-relevant app operations.
+ * Fire-and-forget — never throws (logs errors to console).
+ */
+async function audit(event: {
+	entityType: string;
+	entityId: string;
+	eventType: string;
+	actorId?: string;
+	orgId?: string;
+	details?: Record<string, unknown>;
+}): Promise<void> {
+	try {
+		await db().insert(schema.auditEvents).values({
+			entityType: event.entityType,
+			entityId: event.entityId,
+			eventType: event.eventType,
+			actorId: event.actorId,
+			orgId: event.orgId,
+			details: event.details,
+		});
+	} catch (err) {
+		console.error('[apps-service] audit log failed:', err);
+	}
+}
+
+/**
+ * Resolve an appId that might be a slug to the actual app_store UUID.
+ * If the value matches a slug in app_store, returns the row's id.
+ * Otherwise assumes it is already a UUID and returns as-is.
+ */
+async function resolveAppId(appIdOrSlug: string): Promise<string> {
+	const rows = await db()
+		.select({ id: schema.appStore.id })
+		.from(schema.appStore)
+		.where(eq(schema.appStore.slug, appIdOrSlug))
+		.limit(1);
+	return rows.length > 0 ? rows[0].id : appIdOrSlug;
+}
+
+/** Apps that get auto-installed on fresh boot. Everything else is store-only. */
+const CORE_APP_SLUGS = new Set(['terminal', 'files', 'settings', 'marketplace']);
 
 /** Mission Control manifest — hardcoded since it has no package with manifest.ts. */
 const MISSION_CONTROL_MANIFEST = {
@@ -44,6 +108,26 @@ const MISSION_CONTROL_MANIFEST = {
 		icon: '/icons/dusk/mission_control.svg',
 		categories: ['System'],
 		comment: 'See all your tasks flow through stages',
+	},
+};
+
+/** Marketplace manifest — hardcoded since it's a core UI component, not a package. */
+const MARKETPLACE_MANIFEST = {
+	id: 'marketplace',
+	views: [
+		{
+			id: 'marketplace',
+			label: 'App Store',
+			permission: 'marketplace',
+			minRole: 'member',
+			natsPrefix: 'apps',
+			defaultSize: { width: 1000, height: 700 },
+		},
+	],
+	desktop: {
+		icon: '/icons/dusk/app_store.svg',
+		categories: ['System'],
+		comment: 'Browse and install apps',
 	},
 };
 
@@ -81,7 +165,10 @@ export async function seedCoreApps(): Promise<void> {
 		const entries = readdirSync(packagesDir, { withFileTypes: true });
 		for (const entry of entries) {
 			if (!entry.isDirectory()) continue;
-			const manifestPath = resolve(packagesDir, entry.name, 'manifest.ts');
+			const manifestTs = resolve(packagesDir, entry.name, 'manifest.ts');
+			const manifestJs = resolve(packagesDir, entry.name, 'manifest.js');
+			// Try compiled .js first (binary mode), fall back to .ts (dev mode)
+			const manifestPath = existsSync(manifestJs) ? manifestJs : manifestTs;
 			if (!existsSync(manifestPath)) continue;
 
 			try {
@@ -96,13 +183,18 @@ export async function seedCoreApps(): Promise<void> {
 		}
 	}
 
-	// Add mission-control (no package, hardcoded manifest)
+	// Add hardcoded manifests (no packages with manifest.ts)
 	manifests.push({
 		manifest: MISSION_CONTROL_MANIFEST,
 		pkgDir: resolve(packagesDir, 'mission-control'),
 	});
+	manifests.push({
+		manifest: MARKETPLACE_MANIFEST,
+		pkgDir: resolve(packagesDir, 'marketplace'),
+	});
 
-	// Upsert each manifest's primary view into app_store + installed_apps
+	// Upsert each manifest's primary view into app_store.
+	// Only CORE_APP_SLUGS also get inserted into installed_apps.
 	for (const { manifest, pkgDir } of manifests) {
 		const view = manifest.views[0];
 		if (!view) continue;
@@ -131,30 +223,43 @@ export async function seedCoreApps(): Promise<void> {
 					target: schema.appStore.slug,
 					set: {
 						name: view.label,
+						iconLucide: manifest.desktop?.icon,
+						shortDescription: manifest.desktop?.comment,
+						category: manifest.desktop?.categories?.[0],
+						permission: view.permission,
+						natsPrefix: view.natsPrefix,
+						defaultWidth: view.defaultSize?.width,
+						defaultHeight: view.defaultSize?.height,
+						minRole: view.minRole,
 						manifestJson: manifest,
 						updatedAt: new Date(),
 					},
 				})
 				.returning();
 
-			await db()
-				.insert(schema.installedApps)
-				.values({
-					appId: storeEntry.id,
-					slug: view.id,
-					path: pkgDir,
-					status: 'installed',
-				})
-				.onConflictDoUpdate({
-					target: schema.installedApps.slug,
-					set: {
+			// Only auto-install core apps; others remain store-only
+			if (CORE_APP_SLUGS.has(view.id)) {
+				await db()
+					.insert(schema.installedApps)
+					.values({
 						appId: storeEntry.id,
+						slug: view.id,
 						path: pkgDir,
 						status: 'installed',
-					},
-				});
+					})
+					.onConflictDoUpdate({
+						target: schema.installedApps.slug,
+						set: {
+							appId: storeEntry.id,
+							path: pkgDir,
+							status: 'installed',
+						},
+					});
 
-			console.log(`[apps-service] seeded core app: ${view.id}`);
+				console.log(`[apps-service] seeded core app: ${view.id}`);
+			} else {
+				console.log(`[apps-service] seeded store app: ${view.id} (not auto-installed)`);
+			}
 		} catch (err) {
 			console.warn(`[apps-service] failed to seed ${view.id}:`, err);
 		}
@@ -244,6 +349,10 @@ export const appsHandlers: ServiceHandler[] = [
 					fullSizeContent?: boolean;
 					manifestJson?: unknown;
 					approvalStatus?: 'pending' | 'approved' | 'rejected';
+					itemType?: string;
+					contents?: Array<{ slug: string; itemType: string; required: boolean }>;
+					agentConfig?: unknown;
+					ideaId?: string;
 				}>();
 
 				if (!req.slug || !req.name || !req.repoUrl || !req.path) {
@@ -279,6 +388,12 @@ export const appsHandlers: ServiceHandler[] = [
 						manifestJson: req.manifestJson,
 						currentVersion: req.version,
 						approvalStatus: req.approvalStatus ?? 'pending',
+						itemType:
+							(req.itemType as 'app' | 'workflow' | 'skill' | 'template' | 'stack' | 'agent' | 'board' | 'hook') ??
+							'app',
+						contents: req.contents,
+						agentConfig: req.agentConfig,
+						ideaId: req.ideaId,
 					})
 					.onConflictDoUpdate({
 						target: schema.appStore.slug,
@@ -291,10 +406,22 @@ export const appsHandlers: ServiceHandler[] = [
 							description: req.description,
 							version: req.version,
 							manifestJson: req.manifestJson,
+							itemType:
+								(req.itemType as 'app' | 'workflow' | 'skill' | 'template' | 'stack' | 'agent' | 'board' | 'hook') ??
+								'app',
+							contents: req.contents,
+							agentConfig: req.agentConfig,
+							ideaId: req.ideaId,
 							updatedAt: new Date(),
 						},
 					})
 					.returning();
+
+				// Increment download_count for store installs
+				await db()
+					.update(schema.appStore)
+					.set({ downloadCount: sql`COALESCE(${schema.appStore.downloadCount}, 0) + 1` })
+					.where(eq(schema.appStore.id, storeEntry.id));
 
 				// Upsert into installed_apps (slug is unique)
 				const [installed] = await db()
@@ -315,14 +442,65 @@ export const appsHandlers: ServiceHandler[] = [
 					})
 					.returning();
 
-				msg.respond(JSON.stringify({ ok: true, storeEntry, installed }));
+				// Stack-aware install: if this is a stack with contents, install all contained items transactionally
+				let stackItems = 0;
+				if (storeEntry.itemType === 'stack' && Array.isArray(req.contents) && req.contents.length > 0) {
+					await db().transaction(async (tx) => {
+						for (const item of req.contents!) {
+							// Look up the contained app in app_store by slug
+							const [found] = await tx
+								.select()
+								.from(schema.appStore)
+								.where(eq(schema.appStore.slug, item.slug))
+								.limit(1);
+
+							if (!found) {
+								if (item.required) {
+									throw new Error(`Required stack item not found in app_store: ${item.slug}`);
+								}
+								// Optional item not found — skip
+								continue;
+							}
+
+							// Upsert the contained item into installed_apps
+							await tx
+								.insert(schema.installedApps)
+								.values({
+									appId: found.id,
+									slug: found.slug,
+									path: req.path,
+									status: 'installed',
+								})
+								.onConflictDoUpdate({
+									target: schema.installedApps.slug,
+									set: {
+										appId: found.id,
+										path: req.path,
+										status: 'installed',
+									},
+								});
+
+							stackItems++;
+						}
+					});
+				}
+
+				await audit({
+					entityType: 'app',
+					entityId: req.slug,
+					eventType: 'app.installed',
+					details: { path: req.path, version: req.version, stackItems },
+				});
+
+				publishAppsChanged();
+				msg.respond(JSON.stringify({ ok: true, storeEntry, installed, stackItems }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 			}
 		},
 	},
 
-	// --- Unregister app (delete from installed_apps) ---
+	// --- Unregister app (delete from installed_apps, stack-aware) ---
 	{
 		subject: SUBJECTS.apps.unregister(),
 		handler: async (msg) => {
@@ -333,12 +511,116 @@ export const appsHandlers: ServiceHandler[] = [
 					return;
 				}
 
+				if (CORE_APP_SLUGS.has(req.slug)) {
+					msg.respond(JSON.stringify({ ok: false, error: 'Core apps cannot be uninstalled' }));
+					return;
+				}
+
+				// Check if this is a stack — if so, uninstall all contained items first
+				let stackItemsRemoved = 0;
+				const [storeRow] = await db()
+					.select({ itemType: schema.appStore.itemType, contents: schema.appStore.contents })
+					.from(schema.appStore)
+					.where(eq(schema.appStore.slug, req.slug))
+					.limit(1);
+
+				if (storeRow?.itemType === 'stack' && Array.isArray(storeRow.contents) && storeRow.contents.length > 0) {
+					const contentSlugs = (storeRow.contents as Array<{ slug: string }>).map((c) => c.slug);
+					const removedItems = await db()
+						.delete(schema.installedApps)
+						.where(inArray(schema.installedApps.slug, contentSlugs))
+						.returning();
+					stackItemsRemoved = removedItems.length;
+				}
+
+				// Delete the app/stack itself from installed_apps
 				const deleted = await db()
 					.delete(schema.installedApps)
 					.where(eq(schema.installedApps.slug, req.slug))
 					.returning();
 
-				msg.respond(JSON.stringify({ ok: true, removed: deleted.length }));
+				await audit({
+					entityType: 'app',
+					entityId: req.slug,
+					eventType: 'app.uninstalled',
+					details: { removed: deleted.length, stackItemsRemoved },
+				});
+
+				publishAppsChanged();
+				msg.respond(JSON.stringify({ ok: true, removed: deleted.length, stackItemsRemoved }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Disable app (set status to 'disabled', keep data) ---
+	{
+		subject: SUBJECTS.apps.disable(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{ slug: string; reason?: string; actorId?: string }>();
+				if (!req.slug) {
+					msg.respond(JSON.stringify({ ok: false, error: 'slug is required' }));
+					return;
+				}
+
+				const [updated] = await db()
+					.update(schema.installedApps)
+					.set({ status: 'disabled' })
+					.where(eq(schema.installedApps.slug, req.slug))
+					.returning();
+
+				if (!updated) {
+					msg.respond(JSON.stringify({ ok: false, error: 'App not found' }));
+					return;
+				}
+
+				await audit({
+					entityType: 'app',
+					entityId: req.slug,
+					eventType: req.reason === 'circuit-breaker' ? 'app.auto-disabled' : 'app.disabled',
+					actorId: req.actorId ?? 'system',
+					details: { reason: req.reason ?? 'manual' },
+				});
+
+				msg.respond(JSON.stringify({ ok: true, app: updated }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Enable app (re-enable a disabled app) ---
+	{
+		subject: SUBJECTS.apps.enable(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{ slug: string; actorId?: string }>();
+				if (!req.slug) {
+					msg.respond(JSON.stringify({ ok: false, error: 'slug is required' }));
+					return;
+				}
+
+				const [updated] = await db()
+					.update(schema.installedApps)
+					.set({ status: 'installed' })
+					.where(eq(schema.installedApps.slug, req.slug))
+					.returning();
+
+				if (!updated) {
+					msg.respond(JSON.stringify({ ok: false, error: 'App not found' }));
+					return;
+				}
+
+				await audit({
+					entityType: 'app',
+					entityId: req.slug,
+					eventType: 'app.enabled',
+					actorId: req.actorId ?? 'system',
+				});
+
+				msg.respond(JSON.stringify({ ok: true, app: updated }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 			}
@@ -350,11 +632,24 @@ export const appsHandlers: ServiceHandler[] = [
 		subject: SUBJECTS.apps.store.list(),
 		handler: async (msg) => {
 			try {
-				const rows = await db().select().from(schema.appStore).where(eq(schema.appStore.approvalStatus, 'approved'));
+				const rows = await db()
+					.select({
+						store: schema.appStore,
+						installedSlug: schema.installedApps.slug,
+					})
+					.from(schema.appStore)
+					.leftJoin(schema.installedApps, eq(schema.appStore.slug, schema.installedApps.slug))
+					.where(eq(schema.appStore.approvalStatus, 'approved'));
 
-				msg.respond(JSON.stringify({ apps: rows }));
+				const items = rows.map((r) => ({
+					...r.store,
+					installed: r.installedSlug !== null,
+					core: CORE_APP_SLUGS.has(r.store.slug),
+				}));
+
+				msg.respond(JSON.stringify({ items }));
 			} catch (err) {
-				msg.respond(JSON.stringify({ error: String(err), apps: [] }));
+				msg.respond(JSON.stringify({ error: String(err), items: [] }));
 			}
 		},
 	},
@@ -453,6 +748,266 @@ export const appsHandlers: ServiceHandler[] = [
 				msg.respond(JSON.stringify({ ok: true, entry: updated }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Store: reject app ---
+	{
+		subject: SUBJECTS.apps.store.reject(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{ slug: string; rejectionReason?: string; rejectedBy?: string }>();
+				if (!req.slug) {
+					msg.respond(JSON.stringify({ ok: false, error: 'slug is required' }));
+					return;
+				}
+
+				const MAX_REJECTION_REASON_LENGTH = 500;
+				const sanitizedReason = req.rejectionReason
+					? req.rejectionReason.replace(/<[^>]*>/g, '').slice(0, MAX_REJECTION_REASON_LENGTH)
+					: undefined;
+
+				const [updated] = await db()
+					.update(schema.appStore)
+					.set({
+						approvalStatus: 'rejected',
+						rejectionReason: sanitizedReason,
+						updatedAt: new Date(),
+					})
+					.where(eq(schema.appStore.slug, req.slug))
+					.returning();
+
+				if (!updated) {
+					msg.respond(JSON.stringify({ ok: false, error: 'App not found' }));
+					return;
+				}
+
+				msg.respond(JSON.stringify({ ok: true, entry: updated }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Run: start (insert into app_runs with status running) ---
+	{
+		subject: SUBJECTS.apps.run.start(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{
+					appId: string;
+					appVersion?: string;
+					userId?: string;
+					agentId?: string;
+					automationId?: string;
+					trigger?: string;
+					metadata?: unknown;
+				}>();
+
+				if (!req.appId) {
+					msg.respond(JSON.stringify({ ok: false, error: 'appId is required' }));
+					return;
+				}
+
+				const appId = await resolveAppId(req.appId);
+
+				const [run] = await db()
+					.insert(schema.appRuns)
+					.values({
+						appId,
+						appVersion: req.appVersion,
+						userId: req.userId,
+						agentId: req.agentId,
+						automationId: req.automationId,
+						trigger: (req.trigger as 'manual' | 'scheduled' | 'agent' | 'automation') ?? 'manual',
+						status: 'running',
+						metadata: req.metadata,
+					})
+					.returning();
+
+				msg.respond(JSON.stringify({ ok: true, runId: run.id }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Run: end (update app_runs with status, cost, trace, output) ---
+	{
+		subject: SUBJECTS.apps.run.end(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{
+					runId: string;
+					status: string;
+					costTokens?: number;
+					costComputeMs?: number;
+					costApiCalls?: number;
+					outputSummary?: string;
+					agentTrace?: unknown;
+					metadata?: unknown;
+				}>();
+
+				if (!req.runId || !req.status) {
+					msg.respond(JSON.stringify({ ok: false, error: 'runId and status are required' }));
+					return;
+				}
+
+				// Fetch the run to calculate duration
+				const existing = await db()
+					.select({ startedAt: schema.appRuns.startedAt })
+					.from(schema.appRuns)
+					.where(eq(schema.appRuns.id, req.runId))
+					.limit(1);
+
+				if (existing.length === 0) {
+					msg.respond(JSON.stringify({ ok: false, error: 'Run not found' }));
+					return;
+				}
+
+				const now = new Date();
+				const durationMs = now.getTime() - existing[0].startedAt.getTime();
+
+				await db()
+					.update(schema.appRuns)
+					.set({
+						status: req.status as 'running' | 'success' | 'failure' | 'error' | 'timeout',
+						endedAt: now,
+						durationMs,
+						costTokens: req.costTokens,
+						costComputeMs: req.costComputeMs,
+						costApiCalls: req.costApiCalls,
+						outputSummary: req.outputSummary,
+						agentTrace: req.agentTrace,
+						metadata: req.metadata,
+					})
+					.where(eq(schema.appRuns.id, req.runId));
+
+				msg.respond(JSON.stringify({ ok: true }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Run: list (paginated runs for an app) ---
+	{
+		subject: SUBJECTS.apps.run.list(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{ appId: string; limit?: number; offset?: number }>();
+
+				if (!req.appId) {
+					msg.respond(JSON.stringify({ error: 'appId is required', runs: [] }));
+					return;
+				}
+
+				const appId = await resolveAppId(req.appId);
+				const limit = req.limit ?? 50;
+				const offset = req.offset ?? 0;
+
+				const runs = await db()
+					.select()
+					.from(schema.appRuns)
+					.where(eq(schema.appRuns.appId, appId))
+					.orderBy(sql`${schema.appRuns.startedAt} desc`)
+					.limit(limit)
+					.offset(offset);
+
+				msg.respond(JSON.stringify({ runs }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ error: String(err), runs: [] }));
+			}
+		},
+	},
+
+	// --- Vote: insert into app_votes (idempotent) ---
+	{
+		subject: SUBJECTS.apps.vote(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{ userId: string; appId: string }>();
+
+				if (!req.userId || !req.appId) {
+					msg.respond(JSON.stringify({ ok: false, error: 'userId and appId are required' }));
+					return;
+				}
+
+				const appId = await resolveAppId(req.appId);
+
+				await db().insert(schema.appVotes).values({ userId: req.userId, appId }).onConflictDoNothing();
+
+				msg.respond(JSON.stringify({ ok: true }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Unvote: delete from app_votes ---
+	{
+		subject: SUBJECTS.apps.unvote(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{ userId: string; appId: string }>();
+
+				if (!req.userId || !req.appId) {
+					msg.respond(JSON.stringify({ ok: false, error: 'userId and appId are required' }));
+					return;
+				}
+
+				const appId = await resolveAppId(req.appId);
+
+				await db()
+					.delete(schema.appVotes)
+					.where(and(eq(schema.appVotes.userId, req.userId), eq(schema.appVotes.appId, appId)));
+
+				msg.respond(JSON.stringify({ ok: true }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
+			}
+		},
+	},
+
+	// --- Metrics: aggregated stats for an app ---
+	{
+		subject: SUBJECTS.apps.metrics(),
+		handler: async (msg) => {
+			try {
+				const req = msg.json<{ appId: string }>();
+
+				if (!req.appId) {
+					msg.respond(JSON.stringify({ error: 'appId is required' }));
+					return;
+				}
+
+				const appId = await resolveAppId(req.appId);
+
+				// Aggregate run stats
+				const [runStats] = await db()
+					.select({
+						totalRuns: count(),
+						avgDurationMs: avg(schema.appRuns.durationMs),
+						successCount: count(sql`case when ${schema.appRuns.status} = 'success' then 1 end`),
+					})
+					.from(schema.appRuns)
+					.where(eq(schema.appRuns.appId, appId));
+
+				// Count votes
+				const [voteStats] = await db()
+					.select({ voteCount: count() })
+					.from(schema.appVotes)
+					.where(eq(schema.appVotes.appId, appId));
+
+				const totalRuns = runStats?.totalRuns ?? 0;
+				const avgDurationMs = runStats?.avgDurationMs ? Number(runStats.avgDurationMs) : null;
+				const successRate = totalRuns > 0 ? (runStats?.successCount ?? 0) / totalRuns : null;
+				const voteCount = voteStats?.voteCount ?? 0;
+
+				msg.respond(JSON.stringify({ totalRuns, avgDurationMs, successRate, voteCount }));
+			} catch (err) {
+				msg.respond(JSON.stringify({ error: String(err) }));
 			}
 		},
 	},

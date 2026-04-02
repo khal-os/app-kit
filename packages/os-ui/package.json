@@ -5,9 +5,29 @@
 	"main": "./src/index.ts",
 	"exports": {
 		".": "./src/index.ts",
-		"./server": "./src/server.ts"
+		"./server": "./src/server.ts",
+		"./tokens.css": "./tokens.css"
 	},
 	"peerDependencies": {
-		"react": ">=19"
+		"react": ">=19",
+		"next-themes": ">=0.4",
+		"zustand": ">=4"
+	},
+	"dependencies": {
+		"@number-flow/react": "^0.6.0",
+		"@paper-design/shaders-react": "^0.0.72",
+		"@radix-ui/react-context-menu": "^2.2.16",
+		"@radix-ui/react-dialog": "^1.1.15",
+		"@radix-ui/react-dropdown-menu": "^2.1.16",
+		"@radix-ui/react-separator": "^1.1.8",
+		"@radix-ui/react-slot": "^1.2.4",
+		"@radix-ui/react-switch": "^1.2.6",
+		"@radix-ui/react-tooltip": "^1.2.8",
+		"class-variance-authority": "^0.7.1",
+		"clsx": "^2.1.1",
+		"cmdk": "^1.1.1",
+		"lucide-react": "^0.563.0",
+		"motion": "^12.38.0",
+		"tailwind-merge": "^3.4.0"
 	}
 }

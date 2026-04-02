@@ -1,5 +1,7 @@
-export type { ApiContext, ApiContextWithDb } from './api/handler';
+export type { ApiContext, ApiContextWithDb, ApiUser } from './api/handler';
 export { apiHandler, apiHandlerWithDb } from './api/handler';
+export type { SessionResult, SessionUser } from './api/session';
+export { readSession } from './api/session';
 export {
 	AGENT_REPO_ROOT_ENV,
 	AGENT_WORKTREE_ROOT_ENV,
@@ -18,7 +20,21 @@ export {
 	isDbInitialized,
 } from './db/factory';
 export { runAllMigrations, runMigrations } from './db/migrate';
+// NATS instance isolation
+export {
+	extractInstanceId,
+	INSTANCE_SUBJECT_PREFIX,
+	instanceAuthConfig,
+	instanceSubject,
+	instanceWildcard,
+	isInstanceScoped,
+	stripInstancePrefix,
+	validateInstanceAccess,
+} from './lib/nats-isolation';
 export { interceptConsole, restoreConsole } from './service/console-intercept';
+// Fleet service
+export type { CreateInstanceConfig, FleetService } from './service/fleet';
+export { fleet } from './service/fleet';
 export type { LogEntry, Logger } from './service/logger';
 export { createLogger } from './service/logger';
 export {
@@ -31,6 +47,6 @@ export {
 	O11Y_SUBJECT_TRACES,
 } from './service/o11y-streams';
 export type { Msg, NatsConnection, ObserveConfig, ServiceConfig, ServiceHandler } from './service/runtime';
-export { createService } from './service/runtime';
+export { createEventPublisher, createService } from './service/runtime';
 export type { TraceContext } from './service/trace';
 export { extractTrace, injectTrace, newSpan, PARENT_SPAN_HEADER, SPAN_HEADER, TRACE_HEADER } from './service/trace';

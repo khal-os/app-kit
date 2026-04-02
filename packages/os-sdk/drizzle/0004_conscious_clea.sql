@@ -1,0 +1,1 @@
+ALTER TYPE "public"."installed_app_status" ADD VALUE 'disabled';

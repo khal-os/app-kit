@@ -1,34 +1,58 @@
 // App component props type
-export type { AppComponentProps } from '@/components/apps/app-registry';
+export interface AppComponentProps {
+	windowId: string;
+	meta?: Record<string, unknown>;
+}
 
-// UI Components — re-export from OS host
-
-// OS Primitives
-export * from '@/components/os-primitives';
-export * from '@/components/ui/avatar';
-// shadcn/ui components
-export * from '@/components/ui/badge';
-export * from '@/components/ui/button';
-export * from '@/components/ui/ContextMenu';
-export * from '@/components/ui/command';
-export * from '@/components/ui/dropdown-menu';
-// Design system components
-export * from '@/components/ui/glass-card';
-export * from '@/components/ui/input';
-export * from '@/components/ui/note';
-export * from '@/components/ui/progress-bar';
-export * from '@/components/ui/separator';
-export * from '@/components/ui/spinner';
-export * from '@/components/ui/status-dot';
-export * from '@/components/ui/switch';
-export * from '@/components/ui/theme-provider';
-export * from '@/components/ui/theme-switcher';
-export * from '@/components/ui/tooltip';
-// Auth
-export { useKhalAuth, useKhalAuth as useOSAuth } from '@/lib/auth/use-auth';
-export { useNats, useNatsSubscription } from '@/lib/hooks/use-nats';
-export { SUBJECTS } from '@/lib/subjects';
-export { cn } from '@/lib/utils';
+// Auth — re-export from SDK
+export { SUBJECTS, useKhalAuth, useKhalAuth as useOSAuth, useNats, useNatsSubscription } from '@khal-os/sdk/app';
+// shadcn/ui components — local implementations
+export * from './components/avatar';
+export * from './components/badge';
+export * from './components/button';
+export * from './components/ContextMenu';
+export * from './components/command';
+// Design system components — local implementations
+export * from './components/cost-counter';
+// Design system components — LP section patterns
+export * from './components/data-row';
+export * from './components/dropdown-menu';
+export * from './components/glass-card';
+export * from './components/input';
+export * from './components/khal-logo';
+export * from './components/live-feed';
+export * from './components/mesh-gradient';
+export * from './components/metric-display';
+export * from './components/note';
+export * from './components/number-flow';
+export * from './components/pill-badge';
+export * from './components/progress-bar';
+export * from './components/section-card';
+export * from './components/separator';
+export * from './components/spinner';
+export * from './components/status-dot';
+export * from './components/switch';
+export * from './components/theme-provider';
+export * from './components/theme-switcher';
+export * from './components/ticker-bar';
+export * from './components/tooltip';
+export {
+	useWindowActive,
+	useWindowMinimized,
+	WindowActiveProvider,
+	WindowMinimizedProvider,
+} from './components/window-minimized-context';
+// Hooks
+export { useReducedMotion } from './hooks/useReducedMotion';
+// Animations
+export { fadeIn, fadeUp, khalEasing, scaleUp, springConfig, staggerChild, staggerContainer } from './lib/animations';
+// OS Primitives — local implementations
+export * from './primitives';
+export type { DesktopNotification, DesktopNotifMode, NotificationUrgency, TrayIcon } from './stores/notification-store';
 // Stores (OS-level state)
-export { useNotificationStore } from '@/stores/notification-store';
-export { useThemeStore } from '@/stores/theme-store';
+export { useNotificationStore } from './stores/notification-store';
+export { useThemeStore } from './stores/theme-store';
+// LP Design Tokens
+export * from './tokens/lp-tokens';
+// Utilities
+export { cn } from './utils';

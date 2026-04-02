@@ -1,7 +1,7 @@
 'use client';
 
+import { getNatsClient } from '@khal-os/sdk/app';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getNatsClient } from '@/lib/nats-client';
 
 interface UseNatsRequestResult<T> {
 	data: T | null;
@@ -61,12 +61,29 @@ export function useNatsRequest<T = unknown>(
 			intervalRef.current = setInterval(fetchData, interval);
 		}
 
+		// Pause polling when tab is hidden, resume when visible
+		const handleVisibilityChange = () => {
+			if (interval <= 0) return;
+			if (document.visibilityState === 'hidden') {
+				if (intervalRef.current) {
+					clearInterval(intervalRef.current);
+					intervalRef.current = null;
+				}
+			} else {
+				fetchData();
+				intervalRef.current = setInterval(fetchData, interval);
+			}
+		};
+
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+
 		return () => {
 			mountedRef.current = false;
 			if (intervalRef.current) {
 				clearInterval(intervalRef.current);
 				intervalRef.current = null;
 			}
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
 		};
 	}, [fetchData, interval]);
 

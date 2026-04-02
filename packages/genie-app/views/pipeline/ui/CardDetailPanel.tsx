@@ -1,19 +1,19 @@
 'use client';
 
-import { ArrowRight, Calendar, ChevronDown, Clock, Tag, User, X } from 'lucide-react';
-import { useCallback, useEffect, useRef } from 'react';
-import { Avatar } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
+	Avatar,
+	Badge,
+	Button,
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { GlassCard } from '@/components/ui/glass-card';
-import { ProgressBar } from '@/components/ui/progress-bar';
-import { StatusDot } from '@/components/ui/status-dot';
+	GlassCard,
+	ProgressBar,
+	StatusDot,
+} from '@khal-os/ui';
+import { ArrowRight, Calendar, ChevronDown, Clock, Tag, User, X } from 'lucide-react';
+import { useCallback, useEffect, useRef } from 'react';
 import { PIPELINE_COLUMNS, type PipelineItem, type Priority, type Stage, VALID_TRANSITIONS } from '../types';
 
 interface CardDetailPanelProps {

@@ -17,15 +17,30 @@ export { AWSRuntime } from './aws';
 export { AzureRuntime } from './azure';
 export { BaseRuntime } from './base';
 // Dependency helpers
-export { defaultBinDir, ensureBinary, getBunUrl, getNatsUrl, isBinaryCached } from './deps';
+export {
+	type Arch,
+	defaultBinDir,
+	detectArch,
+	detectPlatform,
+	ensureBinary,
+	getBunUrl,
+	getNatsUrl,
+	isBinaryCached,
+	type Platform,
+} from './deps';
 export { DockerRuntime } from './docker';
 // Factory
 export { createRuntime, detectBestRuntime } from './factory';
 export { FirecrackerRuntime } from './firecracker';
+export type { KubernetesRuntimeConfig } from './kubernetes';
+export { KubernetesRuntime } from './kubernetes';
 // Concrete implementations
 export { LocalRuntime } from './local';
 export { OCIRuntime } from './oci';
 export { RemoteRuntime } from './remote';
+export type { TauriManagedService, TauriSupervisorConfig } from './tauri';
+// Tauri standalone supervisor
+export { createTauriSupervisor, TauriSupervisor } from './tauri';
 // Types
 export type {
 	HealthStatus,

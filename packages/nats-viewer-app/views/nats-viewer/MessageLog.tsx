@@ -1,7 +1,7 @@
 'use client';
 
+import { EmptyState } from '@khal-os/ui';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { EmptyState } from '@/components/os-primitives/empty-state';
 import type { LogEntry } from './types';
 
 // ---------------------------------------------------------------------------

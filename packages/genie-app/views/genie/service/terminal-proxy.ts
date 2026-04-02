@@ -102,8 +102,12 @@ export function createTerminalProxy(nc: NatsConnection, tmux: TmuxControl) {
 		};
 		sessions.set(sessionId, session);
 
-		// Set initial size
-		controlSession.resizeClient(cols, rows);
+		// Set initial size (non-fatal if control session is not yet connected)
+		try {
+			controlSession.resizeClient(cols, rows);
+		} catch {
+			// Control session may not be ready yet — ignore
+		}
 
 		// Initial buffer fill via capture-pane
 		try {

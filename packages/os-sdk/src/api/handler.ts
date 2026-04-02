@@ -1,12 +1,21 @@
-import { withAuth } from '@workos-inc/authkit-nextjs';
 import { type NextRequest, NextResponse } from 'next/server';
 import { type Database, getDb } from '../db/factory';
+import { readSession } from './session';
+
+export interface ApiUser {
+	id: string;
+	email?: string;
+	firstName?: string;
+	lastName?: string;
+}
 
 export interface ApiContext {
-	/** Authenticated WorkOS user. Always present (401 returned if not). */
-	user: NonNullable<Awaited<ReturnType<typeof withAuth>>['user']>;
+	/** Authenticated user. Always present (401 returned if not). */
+	user: ApiUser;
 	/** Original Next.js request. */
 	req: NextRequest;
+	/** True when auth came from HMAC signature, UA bypass, or local mode. */
+	isMachine: boolean;
 }
 
 export interface ApiContextWithDb extends ApiContext {
@@ -16,52 +25,33 @@ export interface ApiContextWithDb extends ApiContext {
 
 type RouteHandler = (req: NextRequest, ...args: unknown[]) => Promise<Response>;
 
-/** Synthetic machine user for headless Chrome bypass. */
-const MACHINE_USER = {
-	id: 'machine',
-	email: 'machine@localhost',
-	emailVerified: true,
-	firstName: 'Machine',
-	lastName: 'User',
-	createdAt: new Date().toISOString(),
-	updatedAt: new Date().toISOString(),
-	object: 'user' as const,
-} as NonNullable<Awaited<ReturnType<typeof withAuth>>['user']>;
-
-/** Check if the request is from headless Chrome with OS_SECRET enabled. */
-function isHeadlessChrome(req: NextRequest): boolean {
-	return Boolean(process.env.OS_SECRET && (req.headers.get('user-agent') ?? '').includes('HeadlessChrome'));
-}
-
 /**
- * Wraps an API route handler with auth.
- * Returns 401 if the user is not authenticated.
+ * Wraps an API route handler with auth via readSession().
+ * Returns 401 JSON if the user is not authenticated.
  */
 export function apiHandler(fn: (ctx: ApiContext) => Promise<Response>): RouteHandler {
 	return async (req: NextRequest, ..._args: unknown[]) => {
-		const auth = await withAuth();
-		if (!auth.user && !isHeadlessChrome(req)) {
+		const session = await readSession();
+		if (!session) {
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 		}
 
-		const user = auth.user ?? MACHINE_USER;
-		return fn({ user, req });
+		return fn({ user: session.user, req, isMachine: session.isMachine });
 	};
 }
 
 /**
- * Wraps an API route handler with auth + db resolution.
- * Returns 401 if the user is not authenticated.
+ * Wraps an API route handler with auth + db resolution via readSession().
+ * Returns 401 JSON if the user is not authenticated.
  */
 export function apiHandlerWithDb(fn: (ctx: ApiContextWithDb) => Promise<Response>): RouteHandler {
 	return async (req: NextRequest, ..._args: unknown[]) => {
-		const auth = await withAuth();
-		if (!auth.user && !isHeadlessChrome(req)) {
+		const session = await readSession();
+		if (!session) {
 			return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 		}
 
-		const user = auth.user ?? MACHINE_USER;
 		const db = getDb();
-		return fn({ user, db, req });
+		return fn({ user: session.user, req, db, isMachine: session.isMachine });
 	};
 }

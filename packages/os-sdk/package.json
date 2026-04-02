@@ -17,16 +17,27 @@
 		"./db/provision": "./src/db/provision.ts",
 		"./db/schema": "./src/db/schema/index.ts",
 		"./db/claim": "./src/db/claim.ts",
-		"./db/operators": "./src/db/operators.ts"
+		"./db/operators": "./src/db/operators.ts",
+		"./app": "./src/app/index.ts",
+		"./app/roles": "./src/app/roles.ts",
+		"./app/subjects": "./src/app/subjects.ts",
+		"./lib/local-mode": "./src/lib/local-mode.ts",
+		"./api/session": "./src/api/session.ts"
 	},
 	"peerDependencies": {
 		"@nats-io/jetstream": ">=3",
 		"@nats-io/nats-core": ">=3",
 		"@nats-io/transport-node": ">=3",
-		"@workos-inc/authkit-nextjs": ">=2",
 		"drizzle-orm": ">=0.45",
-		"next": ">=16",
 		"postgres": ">=3"
+	},
+	"peerDependenciesMeta": {
+		"react": {
+			"optional": true
+		},
+		"@workos-inc/authkit-nextjs": {
+			"optional": true
+		}
 	},
 	"genieOs": {
 		"schema": {
@@ -34,6 +45,10 @@
 		}
 	},
 	"devDependencies": {
+		"@types/pg": "^8.20.0",
 		"drizzle-kit": "^0.31.10"
+	},
+	"dependencies": {
+		"pg": "^8.20.0"
 	}
 }

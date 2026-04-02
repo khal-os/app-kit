@@ -29,6 +29,10 @@ export async function createRuntime(config: RuntimeConfig): Promise<Runtime> {
 			const { DockerRuntime } = await import('./docker');
 			return new DockerRuntime(config);
 		}
+		case 'kubernetes': {
+			const { KubernetesRuntime } = await import('./kubernetes');
+			return new KubernetesRuntime(config);
+		}
 		case 'aws': {
 			const { AWSRuntime } = await import('./aws');
 			return new AWSRuntime(config);
@@ -59,8 +63,15 @@ export async function createRuntime(config: RuntimeConfig): Promise<Runtime> {
  */
 export function detectBestRuntime(): RuntimeType {
 	const explicit = process.env.KHAL_RUNTIME as RuntimeType | undefined;
-	if (explicit && ['local', 'remote', 'vercel', 'firecracker', 'docker', 'aws', 'azure', 'oci'].includes(explicit)) {
+	if (
+		explicit &&
+		['local', 'remote', 'vercel', 'firecracker', 'docker', 'kubernetes', 'aws', 'azure', 'oci'].includes(explicit)
+	) {
 		return explicit;
+	}
+
+	if (process.env.KUBECONFIG) {
+		return 'kubernetes';
 	}
 
 	if (process.env.KHAL_REMOTE_URL) {

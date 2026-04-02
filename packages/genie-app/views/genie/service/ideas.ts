@@ -47,19 +47,15 @@ function slugify(text: string): string {
 		.slice(0, 60);
 }
 
-/** Get all tasks, filter to idea-tagged ones. */
+/** Dedicated project name for idea tasks. */
+const IDEAS_PROJECT = 'ideas';
+
+/** Get all idea tasks from the dedicated ideas project. */
 function listIdeaTasks(): TaskRecord[] {
-	// List tasks with --tags doesn't exist, so list all and filter by metadata marker
-	const result: GenieOutput<TaskRecord[]> = runGenie(['task', 'list', '--json', '--stage', 'draft']);
+	const result: GenieOutput<TaskRecord[]> = runGenie(['task', 'list', '--json', '--project', IDEAS_PROJECT]);
 	if (!result.ok) return [];
 
-	const allDrafts = result.data as TaskRecord[];
-	// Also get brainstorm-stage ideas (promoted ones)
-	const brainstormResult: GenieOutput<TaskRecord[]> = runGenie(['task', 'list', '--json', '--stage', 'brainstorm']);
-	const brainstorms = brainstormResult.ok ? (brainstormResult.data as TaskRecord[]) : [];
-
-	const all = [...allDrafts, ...brainstorms];
-	return all.filter((t) => t.metadata && t.metadata.ideaTag === true);
+	return (result.data as TaskRecord[]) ?? [];
 }
 
 export const ideasHandlers = [
@@ -75,7 +71,7 @@ export const ideasHandlers = [
 				}
 
 				// Create task with stage: draft
-				const args = ['task', 'create', req.title, '--type', 'software'];
+				const args = ['task', 'create', req.title, '--type', 'software', '--project', IDEAS_PROJECT];
 				if (req.description) args.push('--description', req.description);
 
 				const result = runGenie(args, { json: false });

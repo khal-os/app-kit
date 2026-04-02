@@ -17,7 +17,7 @@ export const commsHandlers: ServiceHandler[] = [
 	// --- Send message to agent ---
 	{
 		subject: SUBJECTS.comms.send(),
-		handler: (msg) => {
+		handler: (msg, nc) => {
 			try {
 				const req = msg.json<{ body: string; to: string; from?: string }>();
 				if (!req.body || !req.to) {
@@ -34,6 +34,7 @@ export const commsHandlers: ServiceHandler[] = [
 					return;
 				}
 				msg.respond(JSON.stringify({ ok: true }));
+				nc.publish(SUBJECTS.comms.changed(), JSON.stringify({ ts: Date.now(), event: 'send', to: req.to }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err) }));
 			}
@@ -43,7 +44,7 @@ export const commsHandlers: ServiceHandler[] = [
 	// --- Broadcast message ---
 	{
 		subject: SUBJECTS.comms.broadcast(),
-		handler: (msg) => {
+		handler: (msg, nc) => {
 			try {
 				const req = msg.json<{ body: string; from?: string }>();
 				if (!req.body) {
@@ -60,6 +61,7 @@ export const commsHandlers: ServiceHandler[] = [
 					return;
 				}
 				msg.respond(JSON.stringify({ ok: true }));
+				nc.publish(SUBJECTS.comms.changed(), JSON.stringify({ ts: Date.now(), event: 'broadcast' }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err) }));
 			}
@@ -93,7 +95,7 @@ export const commsHandlers: ServiceHandler[] = [
 	// --- Post to team chat ---
 	{
 		subject: SUBJECTS.comms.chat.post(),
-		handler: (msg) => {
+		handler: (msg, nc) => {
 			try {
 				const req = msg.json<{ message: string; team?: string }>();
 				if (!req.message) {
@@ -110,6 +112,7 @@ export const commsHandlers: ServiceHandler[] = [
 					return;
 				}
 				msg.respond(JSON.stringify({ ok: true }));
+				nc.publish(SUBJECTS.comms.changed(), JSON.stringify({ ts: Date.now(), event: 'chat.post', team: req.team }));
 			} catch (err) {
 				msg.respond(JSON.stringify({ error: String(err) }));
 			}

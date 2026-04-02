@@ -1,10 +1,9 @@
 'use client';
 
+import { useNats } from '@khal-os/sdk/app';
+import { SectionHeader, SidebarNav, SplitPane, StatusBar, Toolbar } from '@khal-os/ui';
 import { Filter, Inbox, Pause, Play, Radio, Send, Trash2 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { SectionHeader, SplitPane, StatusBar, Toolbar } from '@/components/os-primitives';
-import { SidebarNav } from '@/components/os-primitives/sidebar-nav';
-import { useNats } from '@/lib/hooks/use-nats';
 import { MessageLog } from './MessageLog';
 import type { NatsViewerContextValue } from './nats-viewer-context';
 import { NatsViewerContext } from './nats-viewer-context';

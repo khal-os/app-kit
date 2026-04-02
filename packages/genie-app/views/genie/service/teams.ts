@@ -14,6 +14,19 @@ const path = require('node:path') as typeof import('node:path');
 
 const TEAMS_DIR = path.join(process.env.HOME ?? '', '.genie', 'teams');
 
+/**
+ * Publish full teams list to os.genie.teams.changed.
+ */
+function publishTeamsChanged(nc: { publish: (subject: string, data: string) => void }): void {
+	try {
+		const listResult = runGenie<unknown[]>(['team', 'ls', '--json']);
+		const teams = listResult.ok ? listResult.data : [];
+		nc.publish(SUBJECTS.teams.changed(), JSON.stringify({ teams, ts: Date.now() }));
+	} catch {
+		// Never let change event publishing break the service
+	}
+}
+
 export const teamsHandlers: ServiceHandler[] = [
 	// --- List all teams ---
 	{
@@ -55,7 +68,7 @@ export const teamsHandlers: ServiceHandler[] = [
 	// --- Create team (async — spawns worktree + team-lead) ---
 	{
 		subject: SUBJECTS.teams.create(),
-		handler: async (msg) => {
+		handler: async (msg, nc) => {
 			try {
 				const req = msg.json<{ name: string; repo: string; branch?: string; wish?: string; session?: string }>();
 				if (!req.name || !req.repo) {
@@ -74,6 +87,7 @@ export const teamsHandlers: ServiceHandler[] = [
 					return;
 				}
 				msg.respond(JSON.stringify({ ok: true, output: result.data }));
+				publishTeamsChanged(nc);
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 			}
@@ -83,7 +97,7 @@ export const teamsHandlers: ServiceHandler[] = [
 	// --- Disband team ---
 	{
 		subject: SUBJECTS.teams.disband(),
-		handler: (msg) => {
+		handler: (msg, nc) => {
 			try {
 				const req = msg.json<{ name: string }>();
 				if (!req.name) {
@@ -96,6 +110,7 @@ export const teamsHandlers: ServiceHandler[] = [
 					return;
 				}
 				msg.respond(JSON.stringify({ ok: true }));
+				publishTeamsChanged(nc);
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 			}
@@ -105,7 +120,7 @@ export const teamsHandlers: ServiceHandler[] = [
 	// --- Mark team done ---
 	{
 		subject: SUBJECTS.teams.done(),
-		handler: (msg) => {
+		handler: (msg, nc) => {
 			try {
 				const req = msg.json<{ name: string }>();
 				if (!req.name) {
@@ -118,6 +133,7 @@ export const teamsHandlers: ServiceHandler[] = [
 					return;
 				}
 				msg.respond(JSON.stringify({ ok: true }));
+				publishTeamsChanged(nc);
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 			}
@@ -127,7 +143,7 @@ export const teamsHandlers: ServiceHandler[] = [
 	// --- Mark team blocked ---
 	{
 		subject: SUBJECTS.teams.blocked(),
-		handler: (msg) => {
+		handler: (msg, nc) => {
 			try {
 				const req = msg.json<{ name: string }>();
 				if (!req.name) {
@@ -140,6 +156,7 @@ export const teamsHandlers: ServiceHandler[] = [
 					return;
 				}
 				msg.respond(JSON.stringify({ ok: true }));
+				publishTeamsChanged(nc);
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 			}
@@ -149,7 +166,7 @@ export const teamsHandlers: ServiceHandler[] = [
 	// --- Hire agent into team ---
 	{
 		subject: SUBJECTS.teams.hire(),
-		handler: (msg) => {
+		handler: (msg, nc) => {
 			try {
 				const req = msg.json<{ agent: string; team: string }>();
 				if (!req.agent || !req.team) {
@@ -162,6 +179,7 @@ export const teamsHandlers: ServiceHandler[] = [
 					return;
 				}
 				msg.respond(JSON.stringify({ ok: true, output: result.data }));
+				publishTeamsChanged(nc);
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 			}
@@ -171,7 +189,7 @@ export const teamsHandlers: ServiceHandler[] = [
 	// --- Fire agent from team ---
 	{
 		subject: SUBJECTS.teams.fire(),
-		handler: (msg) => {
+		handler: (msg, nc) => {
 			try {
 				const req = msg.json<{ agent: string; team: string }>();
 				if (!req.agent || !req.team) {
@@ -184,6 +202,7 @@ export const teamsHandlers: ServiceHandler[] = [
 					return;
 				}
 				msg.respond(JSON.stringify({ ok: true, output: result.data }));
+				publishTeamsChanged(nc);
 			} catch (err) {
 				msg.respond(JSON.stringify({ ok: false, error: String(err) }));
 			}

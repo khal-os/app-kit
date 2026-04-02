@@ -87,6 +87,9 @@ export class ControlSession extends EventEmitter {
 			env: { ...process.env, LC_ALL: 'C.UTF-8', LANG: 'C.UTF-8' },
 		});
 
+		// Prevent unhandled EPIPE from crashing the process when tmux exits
+		this.proc.stdin?.on('error', () => {});
+
 		const rl = readline.createInterface({ input: this.proc.stdout! });
 
 		rl.on('line', (line) => {

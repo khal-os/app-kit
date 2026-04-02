@@ -129,7 +129,7 @@ createService({
 	subscriptions: [
 		// --- os.fs.list (request-reply) ---
 		{
-			subject: 'os.fs.list',
+			subject: 'khal.*.fs.list',
 			handler: (msg) => {
 				const request = msg.json<FsListRequest & { _authUserId?: string }>();
 				const safePath = resolveSafePath(ROOT, request.path);
@@ -173,7 +173,7 @@ createService({
 		},
 		// --- os.fs.write (request-reply) ---
 		{
-			subject: 'os.fs.write',
+			subject: 'khal.*.fs.write',
 			handler: (msg, nc) => {
 				const request = msg.json<FileWriteRequest & { _authUserId?: string }>();
 				const result = handleWriteOp(nc, request);

@@ -1,7 +1,7 @@
 'use client';
 
+import { Dialog } from '@khal-os/ui';
 import { Trash2 } from 'lucide-react';
-import { Dialog } from '@/components/os-primitives/dialog';
 
 interface DeleteConfirmDialogProps {
 	/** Names of items to delete */
