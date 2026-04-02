@@ -2,6 +2,7 @@
 
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { useEffect, useState } from 'react';
 import { cn } from '../utils';
 
 const themes = [
@@ -19,6 +20,11 @@ interface ThemeSwitcherProps {
 
 function ThemeSwitcher({ small, className, onThemeSwitch, disabled }: ThemeSwitcherProps) {
 	const { theme, setTheme } = useTheme();
+	const [mounted, setMounted] = useState(false);
+	useEffect(() => setMounted(true), []);
+
+	// Avoid hydration mismatch: useTheme() returns different values on server vs client
+	const resolvedTheme = mounted ? theme : undefined;
 
 	return (
 		<fieldset
@@ -30,14 +36,16 @@ function ThemeSwitcher({ small, className, onThemeSwitch, disabled }: ThemeSwitc
 					key={value}
 					type="button"
 					role="radio"
-					aria-checked={theme === value}
+					aria-checked={resolvedTheme === value}
 					onClick={() => {
 						setTheme(value);
 						onThemeSwitch?.(value);
 					}}
 					className={cn(
 						'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-label-12 transition-colors cursor-pointer',
-						theme === value ? 'bg-background-100 text-gray-1000 shadow-sm' : 'text-gray-700 hover:text-gray-1000'
+						resolvedTheme === value
+							? 'bg-background-100 text-gray-1000 shadow-sm'
+							: 'text-gray-700 hover:text-gray-1000'
 					)}
 				>
 					<Icon className={small ? 'h-3.5 w-3.5' : 'h-4 w-4'} />

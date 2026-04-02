@@ -6,7 +6,7 @@
  * Uses Node.js child_process, net, fs, os — server-side only.
  */
 
-import { type ChildProcess, spawn } from 'node:child_process';
+import { type ChildProcess, execSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { homedir } from 'node:os';
@@ -62,14 +62,47 @@ function waitForPort(port: number, host = '127.0.0.1', timeoutMs = 30_000): Prom
 }
 
 /**
- * Check if a TCP port is already in use. Rejects if something is already listening.
+ * Ensure a TCP port is free. If something is listening, kill it and wait.
  */
-function assertPortFree(port: number, host = '127.0.0.1'): Promise<void> {
+function ensurePortFree(port: number, host = '127.0.0.1'): Promise<void> {
 	return new Promise((resolve, reject) => {
 		const socket = createConnection({ port, host });
 		socket.once('connect', () => {
 			socket.destroy();
-			reject(new Error(`Port ${port} is already in use. Kill the conflicting process and retry.`));
+			// Port in use — try to kill whatever is on it
+			try {
+				const pids = execSync(`lsof -ti :${port} 2>/dev/null`, { encoding: 'utf8' }).trim();
+				if (pids) {
+					for (const pid of pids.split('\n')) {
+						try {
+							process.kill(Number(pid), 'SIGKILL');
+						} catch {
+							/* already dead */
+						}
+					}
+				}
+			} catch {
+				/* lsof failed — no PIDs found */
+			}
+
+			// Wait for port to actually free up
+			let attempts = 0;
+			const check = () => {
+				if (attempts++ > 20) {
+					reject(new Error(`Port ${port} still in use after killing occupants.`));
+					return;
+				}
+				const s = createConnection({ port, host });
+				s.once('connect', () => {
+					s.destroy();
+					setTimeout(check, 200);
+				}); // still occupied
+				s.once('error', () => {
+					s.destroy();
+					resolve();
+				}); // freed
+			};
+			setTimeout(check, 500);
 		});
 		socket.once('error', () => {
 			socket.destroy();
@@ -175,9 +208,9 @@ export class LocalRuntime extends BaseRuntime {
 
 		// Pre-flight: ensure critical ports are free before spawning
 		const port = this.config.port ?? NEXT_PORT;
-		await assertPortFree(port);
-		await assertPortFree(NATS_PORT);
-		await assertPortFree(WS_BRIDGE_PORT);
+		await ensurePortFree(port);
+		await ensurePortFree(NATS_PORT);
+		await ensurePortFree(WS_BRIDGE_PORT);
 
 		await this.ensureDeps();
 		this.writePidFile();

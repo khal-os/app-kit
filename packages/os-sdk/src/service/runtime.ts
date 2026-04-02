@@ -123,9 +123,14 @@ async function plainHandler(
 	try {
 		await handler(msg, nc);
 	} catch (err) {
+		const errMsg = err instanceof Error ? err.message : String(err);
 		log.error(`handler error on ${subject}`, {
-			error: err instanceof Error ? err : new Error(String(err)),
+			error: err instanceof Error ? err : new Error(errMsg),
 		});
+		// Respond with error so request-reply callers don't time out silently
+		if (msg.reply) {
+			msg.respond(new TextEncoder().encode(JSON.stringify({ error: errMsg })));
+		}
 	}
 }
 
