@@ -1,7 +1,12 @@
 {
 	"name": "@khal-os/sdk",
-	"version": "0.0.1",
-	"private": true,
+	"version": "1.0.0",
+	"private": false,
+	"scripts": {
+		"build": "echo 'build placeholder'",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check ."
+	},
 	"main": "./src/index.ts",
 	"exports": {
 		".": "./src/index.ts",
@@ -50,5 +55,9 @@
 	},
 	"dependencies": {
 		"pg": "^8.20.0"
+	},
+	"publishConfig": {
+		"access": "public",
+		"provenance": true
 	}
 }

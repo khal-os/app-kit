@@ -2,6 +2,9 @@
 	"name": "@khal-os/terminal-app",
 	"version": "0.0.1",
 	"private": true,
+	"scripts": {
+		"lint": "biome check ."
+	},
 	"main": "./manifest.ts",
 	"exports": {
 		".": "./manifest.ts",
