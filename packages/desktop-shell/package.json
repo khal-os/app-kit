@@ -1,0 +1,24 @@
+{
+	"name": "@khal-os/desktop-shell",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"main": "./src/index.ts",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"peerDependencies": {
+		"react": ">=19",
+		"react-dom": ">=19",
+		"zustand": ">=5",
+		"@khal-os/sdk": ">=1",
+		"@khal-os/ui": ">=1"
+	},
+	"dependencies": {
+		"@paper-design/shaders-react": "^0.0.72",
+		"@sinclair/typebox": "^0.34.48",
+		"lucide-react": "^0.563.0",
+		"motion": "^12.38.0",
+		"uuid": "^13.0.0"
+	}
+}
