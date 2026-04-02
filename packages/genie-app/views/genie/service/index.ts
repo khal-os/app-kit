@@ -3,6 +3,7 @@ import { createService } from '@khal-os/sdk/service';
 import { SUBJECTS } from '../../../lib/subjects';
 import { agentLifecycleHandlers } from './agent-lifecycle';
 import { appsHandlers, seedCoreApps, setAppsNc } from './apps';
+import { boardHandlers } from './boards';
 import { runGenieAsync } from './cli';
 import { commsHandlers } from './comms';
 import { directorySubscriptions } from './directory';
@@ -301,6 +302,7 @@ createService({
 		...commsHandlers,
 		...wishHandlers,
 		...taskHandlers,
+		...boardHandlers,
 		...ideasHandlers,
 		...directorySubscriptions,
 		...systemSubscriptions,

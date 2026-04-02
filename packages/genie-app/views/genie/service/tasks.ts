@@ -53,7 +53,7 @@ export const taskHandlers = [
 		handler: (msg: NatsMsg) => {
 			try {
 				const req = msg.data.length > 0 ? msg.json<{ stage?: string; project?: string }>() : {};
-				const args = ['task', 'list', '--json'];
+				const args = ['task', 'list', '--all', '--json'];
 				if (req.stage) args.push('--stage', req.stage);
 
 				const result: GenieOutput<TaskRecord[]> = runGenie(args);

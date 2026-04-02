@@ -13,13 +13,32 @@ interface PipelineViewProps {
 	meta?: Record<string, unknown>;
 }
 
+/** Map PG board columns to the shape KanbanBoard expects. */
+function mapBoardColumns(
+	boardCols: Array<{ name: string; label: string; color: string; gate: string; action: string | null }>
+): typeof PIPELINE_COLUMNS {
+	return boardCols.map((col) => ({
+		stage: col.name as Stage,
+		label: col.label,
+		color: col.color,
+		gate: col.gate,
+		action: col.action ?? '',
+	}));
+}
+
 export function PipelineView(_props: PipelineViewProps) {
-	const { items, refreshData, moveItem } = usePipelineData();
+	const { items, columns: boardColumns, loading, refreshData, moveItem } = usePipelineData();
 	const { searchQuery, priorityFilter, assigneeFilter, setSearchQuery, setPriorityFilter, setAssigneeFilter } =
 		usePipelineFilters();
 
 	const filteredItems = useFilteredItems(items);
 	const [selectedItem, setSelectedItem] = useState<PipelineItem | null>(null);
+
+	// Use dynamic columns from PG board, fall back to hardcoded
+	const columns = useMemo(
+		() => (boardColumns.length > 0 ? mapBoardColumns(boardColumns) : PIPELINE_COLUMNS),
+		[boardColumns]
+	);
 
 	const assignees = useMemo(() => {
 		const names = new Set<string>();
@@ -40,7 +59,6 @@ export function PipelineView(_props: PipelineViewProps) {
 	const handleMove = useCallback(
 		(itemId: string, toStage: Stage) => {
 			moveItem(itemId, toStage);
-			// Update selected item if it's the one being moved
 			setSelectedItem((prev) =>
 				prev?.id === itemId ? { ...prev, stage: toStage, updatedAt: new Date().toISOString() } : prev
 			);
@@ -48,21 +66,19 @@ export function PipelineView(_props: PipelineViewProps) {
 		[moveItem]
 	);
 
-	// Per-stage counts for the status bar
 	const stageCounts = useMemo(() => {
 		const counts = new Map<Stage, number>();
-		for (const col of PIPELINE_COLUMNS) {
+		for (const col of columns) {
 			counts.set(col.stage, 0);
 		}
 		for (const item of filteredItems) {
 			counts.set(item.stage, (counts.get(item.stage) ?? 0) + 1);
 		}
 		return counts;
-	}, [filteredItems]);
+	}, [filteredItems, columns]);
 
 	return (
 		<div className="relative flex h-full flex-col" style={{ background: 'var(--khal-bg-secondary)' }}>
-			{/* Toolbar */}
 			<PipelineToolbar
 				searchQuery={searchQuery}
 				onSearchChange={setSearchQuery}
@@ -74,10 +90,14 @@ export function PipelineView(_props: PipelineViewProps) {
 				onRefresh={refreshData}
 			/>
 
-			{/* Kanban board */}
-			<KanbanBoard items={filteredItems} onCardClick={handleCardClick} />
+			{loading ? (
+				<div className="flex flex-1 items-center justify-center text-sm" style={{ color: 'var(--khal-text-muted)' }}>
+					Loading pipeline...
+				</div>
+			) : (
+				<KanbanBoard items={filteredItems} columns={columns} onCardClick={handleCardClick} />
+			)}
 
-			{/* Status bar */}
 			<div
 				className="flex h-8 shrink-0 items-center gap-4 border-t px-3 text-[11px] tabular-nums"
 				style={{
@@ -87,7 +107,7 @@ export function PipelineView(_props: PipelineViewProps) {
 			>
 				<span>{filteredItems.length} items</span>
 				<span className="h-3 w-px" style={{ backgroundColor: 'var(--khal-border-default)' }} />
-				{PIPELINE_COLUMNS.map((col) => (
+				{columns.map((col) => (
 					<span key={col.stage} className="flex items-center gap-1">
 						<span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: col.color }} />
 						{col.label}: {stageCounts.get(col.stage) ?? 0}
@@ -95,7 +115,6 @@ export function PipelineView(_props: PipelineViewProps) {
 				))}
 			</div>
 
-			{/* Detail panel */}
 			<CardDetailPanel item={selectedItem} onClose={handleCloseDetail} onMove={handleMove} />
 		</div>
 	);

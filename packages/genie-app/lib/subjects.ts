@@ -92,6 +92,12 @@ export const SUBJECTS = {
 		archive: () => `${PREFIX}.ideas.archive`,
 	},
 
+	// --- Board domain ---
+	board: {
+		list: () => `${PREFIX}.board.list`,
+		show: () => `${PREFIX}.board.show`,
+	},
+
 	// --- Tasks domain ---
 	task: {
 		list: () => `${PREFIX}.task.list`,
