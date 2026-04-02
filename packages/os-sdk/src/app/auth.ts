@@ -33,7 +33,11 @@ export function useKhalAuth(): KhalAuth | null {
 		// Local mode only: provide synthetic identity for npx khal-os
 		// Enterprise instances (KHAL_MODE=team or unset) must authenticate via WorkOS
 		if (process.env.NEXT_PUBLIC_KHAL_MODE === 'local') {
-			const instanceId = process.env.NEXT_PUBLIC_KHAL_INSTANCE_ID || 'default';
+			const instanceId =
+				(typeof window !== 'undefined' &&
+					((window as unknown as Record<string, unknown>).__KHAL_INSTANCE_ID__ as string)) ||
+				process.env.NEXT_PUBLIC_KHAL_INSTANCE_ID ||
+				'default';
 			return {
 				userId: 'local',
 				orgId: instanceId,
@@ -48,15 +52,15 @@ export function useKhalAuth(): KhalAuth | null {
 	const effectiveRole = normalizeRole(role);
 	const effectivePermissions = getRolePermissions(effectiveRole);
 
-	const instanceId = process.env.NEXT_PUBLIC_KHAL_INSTANCE_ID;
-	if (!instanceId) {
-		// biome-ignore lint/suspicious/noConsole: startup diagnostic for missing env var
-		console.error('[auth] NEXT_PUBLIC_KHAL_INSTANCE_ID is not set — NATS subjects will not match server');
-	}
+	const instanceId =
+		(typeof window !== 'undefined' &&
+			((window as unknown as Record<string, unknown>).__KHAL_INSTANCE_ID__ as string)) ||
+		process.env.NEXT_PUBLIC_KHAL_INSTANCE_ID ||
+		'default';
 
 	return {
 		userId: user.id,
-		orgId: instanceId || 'default',
+		orgId: instanceId,
 		role: effectiveRole,
 		permissions: effectivePermissions,
 		loading: false,
