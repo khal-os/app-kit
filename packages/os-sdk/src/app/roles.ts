@@ -6,15 +6,17 @@
  * so platform roles use `platform-` prefix to avoid collisions.
  */
 
-/** Canonical role hierarchy from least to most privileged. */
-export const ROLE_HIERARCHY = ['member', 'platform-dev', 'platform-admin', 'platform-owner'] as const;
-export type Role = (typeof ROLE_HIERARCHY)[number];
+import type { Role } from '@khal-os/types';
+import { ROLE_HIERARCHY } from '@khal-os/types';
+
+export type { Role } from '@khal-os/types';
+export { ROLE_HIERARCHY } from '@khal-os/types';
 
 /**
  * Map legacy / shorthand role slugs to canonical platform role slugs.
  *
- * Used during migration (admin → platform-admin) and for convenience
- * (dev → platform-dev). WorkOS may return legacy slugs during the
+ * Used during migration (admin -> platform-admin) and for convenience
+ * (dev -> platform-dev). WorkOS may return legacy slugs during the
  * transition period.
  */
 const ROLE_ALIASES: Record<string, Role> = {
@@ -52,7 +54,7 @@ export function hasMinRole(userRole: Role, minRole: Role): boolean {
 let _rolePermissions: Record<string, string[]> = {};
 
 /**
- * Compute a role → permissions mapping from a manifest of app entries.
+ * Compute a role -> permissions mapping from a manifest of app entries.
  * Each role gets access to all apps whose `minRole` is at or below its level,
  * plus the `desktop` permission.
  */
@@ -71,7 +73,7 @@ export function computeRolePermissions(
 }
 
 /**
- * Register the role → permissions mapping used by `useKhalAuth`.
+ * Register the role -> permissions mapping used by `useKhalAuth`.
  * Called once by the OS host at startup with the computed permissions.
  */
 export function registerRolePermissions(perms: Record<string, string[]>): void {

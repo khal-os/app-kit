@@ -1,6 +1,8 @@
 // Auth
 export type { KhalAuth } from './auth';
 export { useKhalAuth } from './auth';
+// Auth context (for provider implementations)
+export { KhalAuthContext } from './auth-context';
 
 // Hooks
 export { useNats, useNatsSubscription, useService } from './hooks';

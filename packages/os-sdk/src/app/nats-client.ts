@@ -1,5 +1,7 @@
 'use client';
 
+import type { ConnectionState } from '@khal-os/types';
+
 type MessageCallback = (data: unknown, subject: string) => void;
 type StatusCallback = (connected: boolean) => void;
 
@@ -8,9 +10,6 @@ interface PendingRequest {
 	reject: (error: Error) => void;
 	timer: ReturnType<typeof setTimeout>;
 }
-
-/** Connection states reported by the Rust WS relay. */
-type ConnectionState = 'connected' | 'reconnecting' | 'disconnected' | 'auth_expired' | 'version_mismatch';
 
 type ConnectionStateListener = (state: ConnectionState, detail?: Record<string, unknown>) => void;
 
