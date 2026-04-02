@@ -37,6 +37,11 @@ export interface RuntimeConfig {
 	projectRoot: string;
 	/** Extra environment variables passed to child processes. */
 	env?: Record<string, string>;
+	/**
+	 * When true, only start Next.js — skip NATS, service-loader, and WS bridge.
+	 * Used in enterprise mode where backend services run on a remote server.
+	 */
+	frontendOnly?: boolean;
 }
 
 // ---------------------------------------------------------------------------

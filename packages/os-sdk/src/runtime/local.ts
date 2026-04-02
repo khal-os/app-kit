@@ -203,62 +203,79 @@ export class LocalRuntime extends BaseRuntime {
 	async start(): Promise<void> {
 		if (this.running) return;
 
+		const frontendOnly = this.config.frontendOnly === true;
+
 		// Kill stale runtime from a previous run (if PID file exists)
 		this.killStalePid();
 
 		// Pre-flight: ensure critical ports are free before spawning
 		const port = this.config.port ?? NEXT_PORT;
 		await ensurePortFree(port);
-		await ensurePortFree(NATS_PORT);
-		await ensurePortFree(WS_BRIDGE_PORT);
 
-		await this.ensureDeps();
+		if (!frontendOnly) {
+			await ensurePortFree(NATS_PORT);
+			await ensurePortFree(WS_BRIDGE_PORT);
+		}
+
+		if (!frontendOnly) {
+			await this.ensureDeps();
+		}
 		this.writePidFile();
 
-		const env = {
-			...process.env,
-			...this.config.env,
-			OS_SECRET: this.config.env?.OS_SECRET ?? generateSecret(),
-			NEXT_PUBLIC_KHAL_MODE: 'local',
-			KHAL_INSTANCE_ID: this.config.env?.KHAL_INSTANCE_ID ?? 'default',
-			NEXT_PUBLIC_KHAL_INSTANCE_ID: this.config.env?.KHAL_INSTANCE_ID ?? 'default',
-			NEXT_PUBLIC_WS_URL: 'ws://localhost:4280/ws/nats',
-		};
+		const env = frontendOnly
+			? {
+					...process.env,
+					...this.config.env,
+					NEXT_PUBLIC_KHAL_MODE: 'enterprise',
+					KHAL_INSTANCE_ID: this.config.env?.KHAL_INSTANCE_ID ?? 'default',
+					NEXT_PUBLIC_KHAL_INSTANCE_ID: this.config.env?.KHAL_INSTANCE_ID ?? 'default',
+					NEXT_PUBLIC_WS_URL: 'tauri-channel',
+				}
+			: {
+					...process.env,
+					...this.config.env,
+					OS_SECRET: this.config.env?.OS_SECRET ?? generateSecret(),
+					NEXT_PUBLIC_KHAL_MODE: 'local',
+					KHAL_INSTANCE_ID: this.config.env?.KHAL_INSTANCE_ID ?? 'default',
+					NEXT_PUBLIC_KHAL_INSTANCE_ID: this.config.env?.KHAL_INSTANCE_ID ?? 'default',
+					NEXT_PUBLIC_WS_URL: 'ws://localhost:4280/ws/nats',
+				};
 
 		const projectRoot = this.config.projectRoot;
 
-		// 1. NATS server
-		this.spawnChild('nats', this.natsBin, ['--port', String(NATS_PORT), '--jetstream'], {
-			cwd: projectRoot,
-			env,
-			port: NATS_PORT,
-		});
-		await waitForPort(NATS_PORT);
-
 		// Use node_modules/.bin if available (dev), fall back to npx (release .app bundle)
-		const tsxDirect = join(projectRoot, 'node_modules/.bin/tsx');
 		const nextDirect = join(projectRoot, 'node_modules/.bin/next');
-		const tsxBin = existsSync(tsxDirect) ? tsxDirect : 'npx';
 		const nextBin = existsSync(nextDirect) ? nextDirect : 'npx';
-
-		// Helper: prepend command name when using npx fallback
-		const tsxArgs = (args: string[]) => (tsxBin === 'npx' ? ['tsx', ...args] : args);
 		const nextArgs = (args: string[]) => (nextBin === 'npx' ? ['next', ...args] : args);
 
-		// 2. Service loader (discovers and runs KhalOS services)
-		this.spawnChild('services', tsxBin, tsxArgs(['src/lib/service-loader.ts']), {
-			cwd: projectRoot,
-			env,
-		});
+		if (!frontendOnly) {
+			// 1. NATS server
+			this.spawnChild('nats', this.natsBin, ['--port', String(NATS_PORT), '--jetstream'], {
+				cwd: projectRoot,
+				env,
+				port: NATS_PORT,
+			});
+			await waitForPort(NATS_PORT);
 
-		// 3. WebSocket bridge (NATS <-> browser)
-		this.spawnChild('ws-bridge', tsxBin, tsxArgs(['src/lib/ws-server.ts']), {
-			cwd: projectRoot,
-			env,
-			port: WS_BRIDGE_PORT,
-		});
+			const tsxDirect = join(projectRoot, 'node_modules/.bin/tsx');
+			const tsxBin = existsSync(tsxDirect) ? tsxDirect : 'npx';
+			const tsxArgs = (args: string[]) => (tsxBin === 'npx' ? ['tsx', ...args] : args);
 
-		// 4. Next.js dev server
+			// 2. Service loader (discovers and runs KhalOS services)
+			this.spawnChild('services', tsxBin, tsxArgs(['src/lib/service-loader.ts']), {
+				cwd: projectRoot,
+				env,
+			});
+
+			// 3. WebSocket bridge (NATS <-> browser)
+			this.spawnChild('ws-bridge', tsxBin, tsxArgs(['src/lib/ws-server.ts']), {
+				cwd: projectRoot,
+				env,
+				port: WS_BRIDGE_PORT,
+			});
+		}
+
+		// Next.js dev server (always started)
 		this.spawnChild('next', nextBin, nextArgs(['dev', '--port', String(port)]), {
 			cwd: projectRoot,
 			env,

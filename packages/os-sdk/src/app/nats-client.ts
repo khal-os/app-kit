@@ -9,6 +9,25 @@ interface PendingRequest {
 	timer: ReturnType<typeof setTimeout>;
 }
 
+/** Connection states reported by the Rust WS relay. */
+type ConnectionState = 'connected' | 'reconnecting' | 'disconnected' | 'auth_expired' | 'version_mismatch';
+
+type ConnectionStateListener = (state: ConnectionState, detail?: Record<string, unknown>) => void;
+
+/** Shape of `_state` messages from the Rust WS relay Channel. */
+interface RelayStateMessage {
+	type: '_state';
+	state: string;
+	[key: string]: unknown;
+}
+
+/** Enterprise config returned by `get_enterprise_config` Tauri command. */
+interface EnterpriseConfig {
+	wsUrl: string;
+	token: string;
+	version?: string;
+}
+
 const DEFAULT_REQUEST_TIMEOUT_MS = 5000;
 const MAX_RECONNECT_DELAY_MS = 30_000;
 
@@ -35,11 +54,22 @@ function subjectMatches(pattern: string, subject: string): boolean {
 }
 
 /**
+ * Detect whether we should use Tauri Channel IPC (enterprise mode)
+ * instead of browser WebSocket.
+ */
+function isEnterpriseMode(): boolean {
+	return process.env.NEXT_PUBLIC_WS_URL === 'tauri-channel' || process.env.NEXT_PUBLIC_KHAL_MODE === 'enterprise';
+}
+
+/**
  * Browser-side NATS client that communicates over WebSocket.
  *
  * Connects to the `/ws/nats` bridge endpoint, multiplexing subscribe,
  * publish, and request-reply operations over a single socket. Handles
  * automatic reconnection with exponential backoff.
+ *
+ * In enterprise mode, connects via Tauri Channel IPC through the Rust
+ * WS relay instead of a browser WebSocket.
  */
 class NatsClient {
 	private ws: WebSocket | null = null;
@@ -63,6 +93,14 @@ class NatsClient {
 	private _orgId = '';
 	private _userId = '';
 
+	// Enterprise mode state
+	private enterpriseMode = false;
+	private connId: string | null = null;
+
+	// Connection state (used primarily in enterprise mode)
+	private _connectionState: ConnectionState = 'disconnected';
+	private _stateListeners: Array<ConnectionStateListener> = [];
+
 	constructor() {
 		this.connect();
 	}
@@ -79,6 +117,11 @@ class NatsClient {
 
 	get userId(): string {
 		return this._userId;
+	}
+
+	/** Current connection state (enterprise mode provides richer states). */
+	get connectionState(): ConnectionState {
+		return this._connectionState;
 	}
 
 	/** Set the organization ID used for subject scoping. */
@@ -100,6 +143,18 @@ class NatsClient {
 	}
 
 	/**
+	 * Register a callback invoked when the connection state changes.
+	 * Provides richer state info than `onStatusChange` (reconnecting, auth_expired, etc.).
+	 * Returns an unsubscribe function.
+	 */
+	onConnectionStateChange(listener: ConnectionStateListener): () => void {
+		this._stateListeners.push(listener);
+		return () => {
+			this._stateListeners = this._stateListeners.filter((l) => l !== listener);
+		};
+	}
+
+	/**
 	 * Subscribe to a NATS subject. Supports `*` (single-token) and `>` (multi-token) wildcards.
 	 * Returns an unsubscribe function. The server-side subscription is reference-counted:
 	 * a `sub` frame is sent on first subscriber, `unsub` on last removal.
@@ -110,7 +165,7 @@ class NatsClient {
 			callbacks = new Set();
 			this.subscribers.set(subject, callbacks);
 			// First subscriber for this subject: send sub frame
-			this.send({ op: 'sub', subject });
+			this.sendFrame({ op: 'sub', subject });
 		}
 		callbacks.add(callback);
 
@@ -122,14 +177,14 @@ class NatsClient {
 			if (cbs.size === 0) {
 				this.subscribers.delete(subject);
 				// Last subscriber removed: send unsub frame
-				this.send({ op: 'unsub', subject });
+				this.sendFrame({ op: 'unsub', subject });
 			}
 		};
 	}
 
 	/** Publish a message to a NATS subject (fire-and-forget). */
 	publish(subject: string, data?: unknown): void {
-		this.send({ op: 'pub', subject, data });
+		this.sendFrame({ op: 'pub', subject, data });
 	}
 
 	/**
@@ -147,7 +202,7 @@ class NatsClient {
 			}, timeout);
 
 			this.pendingRequests.set(id, { resolve, reject, timer });
-			this.send({ op: 'req', id, subject, data });
+			this.sendFrame({ op: 'req', id, subject, data });
 		});
 	}
 
@@ -156,6 +211,16 @@ class NatsClient {
 	private connect(): void {
 		if (typeof window === 'undefined') return;
 
+		if (isEnterpriseMode()) {
+			this.connectViaTauri();
+			return;
+		}
+
+		this.connectViaWebSocket();
+	}
+
+	/** Connect via browser WebSocket (local mode — original behavior). */
+	private connectViaWebSocket(): void {
 		const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 		const envUrl = process.env.NEXT_PUBLIC_WS_URL;
 		const url = envUrl || `${wsProtocol}//${window.location.host}/ws/nats`;
@@ -166,9 +231,10 @@ class NatsClient {
 		ws.addEventListener('open', () => {
 			this.reconnectAttempt = 0;
 			this.setConnected(true);
+			this.setConnectionState('connected');
 			// Re-subscribe all active subjects
 			for (const subject of this.subscribers.keys()) {
-				this.send({ op: 'sub', subject });
+				this.sendFrame({ op: 'sub', subject });
 			}
 		});
 
@@ -178,6 +244,7 @@ class NatsClient {
 
 		ws.addEventListener('close', () => {
 			this.setConnected(false);
+			this.setConnectionState('disconnected');
 			this.ws = null;
 			if (!this.intentionallyClosed) {
 				this.scheduleReconnect();
@@ -187,6 +254,73 @@ class NatsClient {
 		ws.addEventListener('error', () => {
 			// The close event will fire after error, so reconnect is handled there.
 		});
+	}
+
+	/**
+	 * Connect via Tauri Channel IPC (enterprise mode).
+	 * Uses the Rust WS relay to connect to the remote server.
+	 */
+	private async connectViaTauri(): Promise<void> {
+		try {
+			const tauri = (window as TauriGlobal).__TAURI__;
+			if (!tauri?.core) {
+				throw new Error('Tauri IPC not available');
+			}
+
+			// Get auth config from Tauri (stored in Rust AppState by Group 6)
+			const config = (await tauri.core.invoke('get_enterprise_config')) as EnterpriseConfig | null;
+			if (!config) {
+				throw new Error('Enterprise config not available');
+			}
+
+			// Create a Tauri Channel for receiving messages from the Rust relay
+			const channel = new tauri.core.Channel<string>();
+
+			channel.onmessage = (frame: string) => {
+				// Check for connection state messages from the relay
+				try {
+					const parsed = JSON.parse(frame) as Record<string, unknown>;
+					if (parsed.type === '_state') {
+						const stateMsg = parsed as unknown as RelayStateMessage;
+						const state = stateMsg.state as ConnectionState;
+						this.setConnectionState(state, parsed);
+
+						// Update simple connected flag based on state
+						if (state === 'connected') {
+							this.setConnected(true);
+							// Re-subscribe all active subjects after reconnection
+							for (const subject of this.subscribers.keys()) {
+								this.sendFrame({ op: 'sub', subject });
+							}
+						} else if (state === 'disconnected' || state === 'auth_expired' || state === 'version_mismatch') {
+							this.setConnected(false);
+						}
+						return;
+					}
+				} catch {
+					// Not JSON or not a state message — fall through to handle as NATS frame
+				}
+
+				// Regular NATS frame — handle normally
+				this.handleMessage(frame);
+			};
+
+			const connId = (await tauri.core.invoke('connect_enterprise_ws', {
+				url: config.wsUrl,
+				token: config.token,
+				version: config.version || '0.0.0',
+				onMessage: channel,
+			})) as string;
+
+			this.connId = connId;
+			this.enterpriseMode = true;
+			this.setConnected(true);
+			this.setConnectionState('connected');
+		} catch (err) {
+			// biome-ignore lint/suspicious/noConsole: connection error logging
+			console.error('[nats-client] enterprise connection failed:', err);
+			this.setConnectionState('disconnected');
+		}
 	}
 
 	private handleMessage(raw: string | ArrayBuffer | Blob): void {
@@ -245,9 +379,24 @@ class NatsClient {
 		}
 	}
 
-	private send(frame: Record<string, unknown>): void {
+	/**
+	 * Send a JSON frame. Routes through Tauri IPC in enterprise mode,
+	 * or through the browser WebSocket in local mode.
+	 */
+	private sendFrame(frame: Record<string, unknown>): void {
+		const data = JSON.stringify(frame);
+
+		if (this.enterpriseMode && this.connId) {
+			const tauri = (window as TauriGlobal).__TAURI__;
+			tauri?.core?.invoke('send_enterprise_ws', {
+				connId: this.connId,
+				data,
+			});
+			return;
+		}
+
 		if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-			this.ws.send(JSON.stringify(frame));
+			this.ws.send(data);
 		}
 	}
 
@@ -257,6 +406,17 @@ class NatsClient {
 		for (const listener of this.statusListeners) {
 			try {
 				listener(value);
+			} catch {
+				// Protect against listener errors.
+			}
+		}
+	}
+
+	private setConnectionState(state: ConnectionState, detail?: Record<string, unknown>): void {
+		this._connectionState = state;
+		for (const l of this._stateListeners) {
+			try {
+				l(state, detail);
 			} catch {
 				// Protect against listener errors.
 			}
@@ -274,6 +434,26 @@ class NatsClient {
 			this.connect();
 		}, delay);
 	}
+}
+
+// --- Tauri global type (available via withGlobalTauri: true) ---
+
+/** Minimal type for the Tauri Channel constructor exposed on `window.__TAURI__`. */
+interface TauriChannel<T> {
+	onmessage: (message: T) => void;
+}
+
+interface TauriChannelConstructor {
+	new <T>(): TauriChannel<T>;
+}
+
+interface TauriGlobal {
+	__TAURI__?: {
+		core: {
+			invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
+			Channel: TauriChannelConstructor;
+		};
+	};
 }
 
 // Singleton
