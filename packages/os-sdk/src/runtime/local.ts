@@ -235,25 +235,31 @@ export class LocalRuntime extends BaseRuntime {
 		});
 		await waitForPort(NATS_PORT);
 
-		// Use node_modules/.bin directly to avoid npx wrapper (which creates orphan process chains)
-		const tsxBin = join(projectRoot, 'node_modules/.bin/tsx');
-		const nextBin = join(projectRoot, 'node_modules/.bin/next');
+		// Use node_modules/.bin if available (dev), fall back to npx (release .app bundle)
+		const tsxDirect = join(projectRoot, 'node_modules/.bin/tsx');
+		const nextDirect = join(projectRoot, 'node_modules/.bin/next');
+		const tsxBin = existsSync(tsxDirect) ? tsxDirect : 'npx';
+		const nextBin = existsSync(nextDirect) ? nextDirect : 'npx';
+
+		// Helper: prepend command name when using npx fallback
+		const tsxArgs = (args: string[]) => (tsxBin === 'npx' ? ['tsx', ...args] : args);
+		const nextArgs = (args: string[]) => (nextBin === 'npx' ? ['next', ...args] : args);
 
 		// 2. Service loader (discovers and runs KhalOS services)
-		this.spawnChild('services', tsxBin, ['src/lib/service-loader.ts'], {
+		this.spawnChild('services', tsxBin, tsxArgs(['src/lib/service-loader.ts']), {
 			cwd: projectRoot,
 			env,
 		});
 
 		// 3. WebSocket bridge (NATS <-> browser)
-		this.spawnChild('ws-bridge', tsxBin, ['src/lib/ws-server.ts'], {
+		this.spawnChild('ws-bridge', tsxBin, tsxArgs(['src/lib/ws-server.ts']), {
 			cwd: projectRoot,
 			env,
 			port: WS_BRIDGE_PORT,
 		});
 
 		// 4. Next.js dev server
-		this.spawnChild('next', nextBin, ['dev', '--port', String(port)], {
+		this.spawnChild('next', nextBin, nextArgs(['dev', '--port', String(port)]), {
 			cwd: projectRoot,
 			env,
 			port,
