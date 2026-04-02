@@ -7,7 +7,7 @@
  */
 
 import { type ChildProcess, spawn } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -58,6 +58,23 @@ function waitForPort(port: number, host = '127.0.0.1', timeoutMs = 30_000): Prom
 		}
 
 		attempt();
+	});
+}
+
+/**
+ * Check if a TCP port is already in use. Rejects if something is already listening.
+ */
+function assertPortFree(port: number, host = '127.0.0.1'): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const socket = createConnection({ port, host });
+		socket.once('connect', () => {
+			socket.destroy();
+			reject(new Error(`Port ${port} is already in use. Kill the conflicting process and retry.`));
+		});
+		socket.once('error', () => {
+			socket.destroy();
+			resolve(); // Connection refused = port is free
+		});
 	});
 }
 
@@ -153,6 +170,15 @@ export class LocalRuntime extends BaseRuntime {
 	async start(): Promise<void> {
 		if (this.running) return;
 
+		// Kill stale runtime from a previous run (if PID file exists)
+		this.killStalePid();
+
+		// Pre-flight: ensure critical ports are free before spawning
+		const port = this.config.port ?? NEXT_PORT;
+		await assertPortFree(port);
+		await assertPortFree(NATS_PORT);
+		await assertPortFree(WS_BRIDGE_PORT);
+
 		await this.ensureDeps();
 		this.writePidFile();
 
@@ -161,12 +187,12 @@ export class LocalRuntime extends BaseRuntime {
 			...this.config.env,
 			OS_SECRET: this.config.env?.OS_SECRET ?? generateSecret(),
 			NEXT_PUBLIC_KHAL_MODE: 'local',
+			KHAL_INSTANCE_ID: this.config.env?.KHAL_INSTANCE_ID ?? 'default',
 			NEXT_PUBLIC_KHAL_INSTANCE_ID: this.config.env?.KHAL_INSTANCE_ID ?? 'default',
 			NEXT_PUBLIC_WS_URL: 'ws://localhost:4280/ws/nats',
 		};
 
 		const projectRoot = this.config.projectRoot;
-		const port = this.config.port ?? NEXT_PORT;
 
 		// 1. NATS server
 		this.spawnChild('nats', this.natsBin, ['--port', String(NATS_PORT), '--jetstream'], {
@@ -176,21 +202,25 @@ export class LocalRuntime extends BaseRuntime {
 		});
 		await waitForPort(NATS_PORT);
 
+		// Use node_modules/.bin directly to avoid npx wrapper (which creates orphan process chains)
+		const tsxBin = join(projectRoot, 'node_modules/.bin/tsx');
+		const nextBin = join(projectRoot, 'node_modules/.bin/next');
+
 		// 2. Service loader (discovers and runs KhalOS services)
-		this.spawnChild('services', 'npx', ['tsx', 'src/lib/service-loader.ts'], {
+		this.spawnChild('services', tsxBin, ['src/lib/service-loader.ts'], {
 			cwd: projectRoot,
 			env,
 		});
 
 		// 3. WebSocket bridge (NATS <-> browser)
-		this.spawnChild('ws-bridge', 'npx', ['tsx', 'src/lib/ws-server.ts'], {
+		this.spawnChild('ws-bridge', tsxBin, ['src/lib/ws-server.ts'], {
 			cwd: projectRoot,
 			env,
 			port: WS_BRIDGE_PORT,
 		});
 
 		// 4. Next.js dev server
-		this.spawnChild('next', 'npx', ['next', 'dev', '--port', String(port)], {
+		this.spawnChild('next', nextBin, ['dev', '--port', String(port)], {
 			cwd: projectRoot,
 			env,
 			port,
@@ -201,6 +231,23 @@ export class LocalRuntime extends BaseRuntime {
 
 		this.running = true;
 		this.startedAt = Date.now();
+
+		// Safety net: kill all children if this process exits unexpectedly
+		const emergencyCleanup = () => {
+			for (const child of this.children) {
+				if (child.process.pid && !child.process.killed) {
+					try {
+						child.process.kill('SIGKILL');
+					} catch {
+						/* already dead */
+					}
+				}
+			}
+		};
+		process.once('exit', emergencyCleanup);
+		process.once('SIGTERM', emergencyCleanup);
+		process.once('SIGINT', emergencyCleanup);
+
 		this.emit({ type: 'runtime:ready' });
 	}
 
@@ -209,11 +256,15 @@ export class LocalRuntime extends BaseRuntime {
 
 		this.running = false;
 
-		// SIGTERM all children.
+		// SIGTERM all children directly (they share our process group).
 		for (const child of this.children) {
 			this.emit({ type: 'service:stopped', name: child.name });
 			if (child.process.pid && !child.process.killed) {
-				child.process.kill('SIGTERM');
+				try {
+					child.process.kill('SIGTERM');
+				} catch {
+					/* already dead */
+				}
 			}
 		}
 
@@ -224,7 +275,11 @@ export class LocalRuntime extends BaseRuntime {
 					new Promise<void>((resolve) => {
 						const timer = setTimeout(() => {
 							if (child.process.pid && !child.process.killed) {
-								child.process.kill('SIGKILL');
+								try {
+									child.process.kill('SIGKILL');
+								} catch {
+									/* already dead */
+								}
 							}
 							resolve();
 						}, STOP_TIMEOUT_MS);
@@ -321,6 +376,40 @@ export class LocalRuntime extends BaseRuntime {
 		if (child.pid) {
 			this.emit({ type: 'service:ready', name, port: opts.port, pid: child.pid });
 		}
+	}
+
+	/**
+	 * Kill a stale runtime process from a previous run using the PID file.
+	 * Best-effort: if the PID is gone or the file is missing, we silently continue.
+	 */
+	private killStalePid(): void {
+		const pidFile = this.pidFilePath();
+		if (!existsSync(pidFile)) return;
+
+		try {
+			const oldPid = Number.parseInt(readFileSync(pidFile, 'utf8').trim(), 10);
+			if (!Number.isNaN(oldPid) && oldPid > 0 && oldPid !== process.pid) {
+				process.kill(oldPid, 'SIGTERM');
+				// Brief synchronous wait for the old process tree to wind down
+				const deadline = Date.now() + 2_000;
+				while (Date.now() < deadline) {
+					try {
+						process.kill(oldPid, 0); // Probe: throws if process is gone
+						// Still alive, spin-wait
+						const waitUntil = Date.now() + 100;
+						while (Date.now() < waitUntil) {
+							/* busy wait */
+						}
+					} catch {
+						break; // Process is gone
+					}
+				}
+			}
+		} catch {
+			// Process already dead or permission error — either way, continue.
+		}
+
+		rmSync(pidFile, { force: true });
 	}
 
 	private pidFilePath(): string {
