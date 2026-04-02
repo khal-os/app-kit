@@ -162,6 +162,7 @@ export class LocalRuntime extends BaseRuntime {
 			OS_SECRET: this.config.env?.OS_SECRET ?? generateSecret(),
 			NEXT_PUBLIC_KHAL_MODE: 'local',
 			NEXT_PUBLIC_KHAL_INSTANCE_ID: this.config.env?.KHAL_INSTANCE_ID ?? 'default',
+			NEXT_PUBLIC_WS_URL: 'ws://localhost:4280/ws/nats',
 		};
 
 		const projectRoot = this.config.projectRoot;

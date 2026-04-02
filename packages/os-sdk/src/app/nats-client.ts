@@ -157,7 +157,8 @@ class NatsClient {
 		if (typeof window === 'undefined') return;
 
 		const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-		const url = `${wsProtocol}//${window.location.host}/ws/nats`;
+		const envUrl = process.env.NEXT_PUBLIC_WS_URL;
+		const url = envUrl || `${wsProtocol}//${window.location.host}/ws/nats`;
 
 		const ws = new WebSocket(url);
 		this.ws = ws;
