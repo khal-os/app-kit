@@ -1,4 +1,0 @@
-// Server-safe exports for API routes and background services.
-// Keep this entrypoint free of client hooks/components.
-
-export { SUBJECTS } from '@khal-os/sdk/app';
