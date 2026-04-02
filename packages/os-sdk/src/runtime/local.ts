@@ -266,7 +266,12 @@ export class LocalRuntime extends BaseRuntime {
 		});
 
 		// Wait for Next.js to be ready.
-		await waitForPort(port);
+		try {
+			await waitForPort(port);
+		} catch (err) {
+			this.emit({ type: 'runtime:error', error: `Next.js failed to start on port ${port}: ${err}` });
+			return;
+		}
 
 		this.running = true;
 		this.startedAt = Date.now();
@@ -389,6 +394,8 @@ export class LocalRuntime extends BaseRuntime {
 	): void {
 		this.emit({ type: 'service:starting', name });
 
+		this.emit({ type: 'log', source: name, level: 'info', message: `spawning: ${command} ${args.join(' ')}` });
+
 		const child = spawn(command, args, {
 			cwd: opts.cwd,
 			env: opts.env as NodeJS.ProcessEnv,
@@ -397,6 +404,10 @@ export class LocalRuntime extends BaseRuntime {
 
 		const managed: ManagedProcess = { name, process: child, port: opts.port };
 		this.children.push(managed);
+
+		child.on('error', (err) => {
+			this.emit({ type: 'service:error', name, error: `spawn failed: ${err.message}` });
+		});
 
 		child.stdout?.on('data', (data: Buffer) => {
 			this.emit({ type: 'log', source: name, level: 'info', message: data.toString().trimEnd() });
