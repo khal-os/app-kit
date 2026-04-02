@@ -10,8 +10,7 @@
 		"jsx": "react-jsx",
 		"incremental": true,
 		"composite": true,
-		"outDir": "./dist",
-		"skipLibCheck": true
+		"outDir": "./dist"
 	},
-	"include": ["src/**/*.ts", "src/**/*.tsx"]
+	"include": ["src/**/*.ts"]
 }

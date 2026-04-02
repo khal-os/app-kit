@@ -2,62 +2,36 @@
 	"name": "@khal-os/sdk",
 	"version": "1.0.1",
 	"private": false,
-	"scripts": {
-		"build": "echo 'build placeholder'",
-		"typecheck": "tsc --noEmit",
-		"lint": "biome check ."
-	},
 	"main": "./src/index.ts",
 	"exports": {
 		".": "./src/index.ts",
-		"./config": "./src/config.ts",
-		"./runtime": "./src/runtime/index.ts",
-		"./service": "./src/service/runtime.ts",
-		"./service/logger": "./src/service/logger.ts",
-		"./service/console-intercept": "./src/service/console-intercept.ts",
-		"./service/o11y-streams": "./src/service/o11y-streams.ts",
-		"./service/trace": "./src/service/trace.ts",
-		"./db": "./src/db/factory.ts",
-		"./db/migrate": "./src/db/migrate.ts",
-		"./db/provision": "./src/db/provision.ts",
-		"./db/schema": "./src/db/schema/index.ts",
-		"./db/claim": "./src/db/claim.ts",
-		"./db/operators": "./src/db/operators.ts",
 		"./app": "./src/app/index.ts",
 		"./app/roles": "./src/app/roles.ts",
-		"./app/subjects": "./src/app/subjects.ts",
-		"./lib/local-mode": "./src/lib/local-mode.ts",
-		"./api/session": "./src/api/session.ts"
+		"./app/subjects": "./src/app/subjects.ts"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"scripts": {
+		"build": "tsup",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check ."
 	},
 	"peerDependencies": {
-		"@nats-io/jetstream": ">=3",
-		"@nats-io/nats-core": ">=3",
-		"@nats-io/transport-node": ">=3",
-		"drizzle-orm": ">=0.45",
-		"postgres": ">=3"
+		"react": ">=18"
 	},
 	"peerDependenciesMeta": {
 		"react": {
 			"optional": true
-		},
-		"@workos-inc/authkit-nextjs": {
-			"optional": true
 		}
-	},
-	"genieOs": {
-		"schema": {
-			"schemaName": "public"
-		}
-	},
-	"devDependencies": {
-		"@types/pg": "^8.20.0",
-		"drizzle-kit": "^0.31.10"
 	},
 	"dependencies": {
-		"pg": "^8.20.0"
+		"@khal-os/types": "workspace:*"
 	},
 	"publishConfig": {
-		"access": "public"
+		"access": "public",
+		"provenance": true
 	},
 	"license": "Elastic-2.0"
 }

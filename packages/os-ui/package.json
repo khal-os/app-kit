@@ -3,7 +3,7 @@
 	"version": "1.0.1",
 	"private": false,
 	"scripts": {
-		"build": "echo 'build placeholder'",
+		"build": "tsup",
 		"typecheck": "tsc --noEmit",
 		"lint": "biome check ."
 	},
@@ -12,6 +12,11 @@
 		".": "./src/index.ts",
 		"./tokens.css": "./tokens.css"
 	},
+	"files": [
+		"dist",
+		"src",
+		"tokens.css"
+	],
 	"peerDependencies": {
 		"react": ">=19",
 		"next-themes": ">=0.4",
