@@ -1,0 +1,103 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.4.2/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true,
+		"defaultBranch": "main"
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"indentWidth": 2,
+		"lineWidth": 120
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"a11y": {
+				"useButtonType": "off",
+				"useSemanticElements": "off",
+				"noStaticElementInteractions": "off",
+				"useKeyWithClickEvents": "off",
+				"noSvgWithoutTitle": "off",
+				"useFocusableInteractive": "off",
+				"useAriaPropsForRole": "off",
+				"noLabelWithoutControl": "off",
+				"useAriaPropsSupportedByRole": "off",
+				"noNoninteractiveTabindex": "off"
+			},
+			"suspicious": {
+				"noExplicitAny": "error",
+				"noConsole": "warn",
+				"noTsIgnore": "off",
+				"useBiomeIgnoreFolder": "off",
+				"noArrayIndexKey": "off"
+			},
+			"style": {
+				"noUnusedTemplateLiteral": "error",
+				"useImportType": "off",
+				"noNonNullAssertion": "off",
+				"useTemplate": "off",
+				"useNodejsImportProtocol": "off",
+				"useConst": "error"
+			},
+			"correctness": {
+				"noUnusedImports": "error",
+				"noUnusedVariables": "error",
+				"noUnusedFunctionParameters": "error",
+				"useExhaustiveDependencies": "off",
+				"useHookAtTopLevel": "off"
+			},
+			"complexity": {
+				"useLiteralKeys": "off",
+				"noImportantStyles": "off",
+				"useOptionalChain": "off",
+				"noExcessiveCognitiveComplexity": "off",
+				"useFlatMap": "error"
+			},
+			"performance": {
+				"noImgElement": "off"
+			}
+		}
+	},
+	"css": {
+		"parser": {
+			"cssModules": false,
+			"allowWrongLineComments": false
+		},
+		"linter": {
+			"enabled": false
+		}
+	},
+	"javascript": {
+		"globals": ["React"],
+		"formatter": {
+			"quoteStyle": "single",
+			"trailingCommas": "es5",
+			"semicolons": "always"
+		}
+	},
+	"files": {
+		"includes": [
+			"**",
+			"!node_modules/**",
+			"!**/dist/**"
+		]
+	},
+	"overrides": [
+		{
+			"includes": [
+				"**/service/**"
+			],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noConsole": "off"
+					}
+				}
+			}
+		}
+	]
+}
