@@ -1,9 +1,9 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "hello-agent-manager",
 	"name": "Agent Manager",
 	"version": "1.0.0",
-	"description": "Manage HELLO voice agents — create, configure, and monitor voice AI agents.",
+	"description": "Manage HELLO voice agents \u2014 create, configure, and monitor voice AI agents.",
 	"author": "Namastex",
 	"license": "Elastic-2.0",
 	"repository": "https://github.com/khal-os/app-kit",
@@ -14,7 +14,10 @@
 			"permission": "hello-agent-manager",
 			"minRole": "platform-admin",
 			"natsPrefix": "hello",
-			"defaultSize": { "width": 960, "height": 640 },
+			"defaultSize": {
+				"width": 960,
+				"height": 640
+			},
 			"component": "./views/agent-manager/AgentManager"
 		}
 	],

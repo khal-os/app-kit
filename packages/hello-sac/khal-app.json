@@ -1,9 +1,9 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "hello-sac",
 	"name": "SAC Co-Pilot",
 	"version": "1.0.0",
-	"description": "Outbound voice agent cockpit for SAC operations — real-time call management.",
+	"description": "Outbound voice agent cockpit for SAC operations \u2014 real-time call management.",
 	"author": "Namastex",
 	"license": "Elastic-2.0",
 	"repository": "https://github.com/khal-os/app-kit",
@@ -14,7 +14,10 @@
 			"permission": "hello-sac",
 			"minRole": "platform-admin",
 			"natsPrefix": "hello",
-			"defaultSize": { "width": 1200, "height": 800 },
+			"defaultSize": {
+				"width": 1200,
+				"height": 800
+			},
 			"component": "./views/hello-sac"
 		}
 	],

@@ -1,9 +1,9 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "settings-app",
 	"name": "Settings",
 	"version": "1.0.0",
-	"description": "Desktop settings — manage services, apps, permissions, and system configuration.",
+	"description": "Desktop settings \u2014 manage services, apps, permissions, and system configuration.",
 	"author": "Namastex",
 	"license": "Elastic-2.0",
 	"repository": "https://github.com/khal-os/app-kit",
@@ -13,7 +13,10 @@
 			"label": "Settings",
 			"permission": "settings",
 			"minRole": "platform-dev",
-			"defaultSize": { "width": 800, "height": 600 },
+			"defaultSize": {
+				"width": 800,
+				"height": 600
+			},
 			"component": "./views/settings/Settings"
 		}
 	],
