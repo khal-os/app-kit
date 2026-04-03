@@ -1,0 +1,19 @@
+{
+	"schemaVersion": 1,
+	"id": "desktop-shell",
+	"name": "Desktop Shell",
+	"version": "1.0.0",
+	"description": "KhalOS desktop shell — window management, taskbar, workspace switcher, and app launcher.",
+	"author": "Namastex",
+	"license": "Elastic-2.0",
+	"repository": "https://github.com/khal-os/app-kit",
+	"views": [],
+	"desktop": {
+		"icon": "/icons/dusk/finder.svg",
+		"categories": ["System"],
+		"comment": "Desktop shell and window manager"
+	},
+	"tauri": {
+		"exportable": false
+	}
+}

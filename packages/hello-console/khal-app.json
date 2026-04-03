@@ -1,0 +1,29 @@
+{
+	"schemaVersion": 1,
+	"id": "hello-console",
+	"name": "Voice Console",
+	"version": "1.0.0",
+	"description": "Monitor HELLO voice agents in real-time — live call transcripts, metrics, and controls.",
+	"author": "Namastex",
+	"license": "Elastic-2.0",
+	"repository": "https://github.com/khal-os/app-kit",
+	"views": [
+		{
+			"id": "console",
+			"label": "Voice Console",
+			"permission": "hello-console",
+			"minRole": "platform-admin",
+			"natsPrefix": "hello",
+			"defaultSize": { "width": 1100, "height": 700 },
+			"component": "./views/console/Console"
+		}
+	],
+	"desktop": {
+		"icon": "/icons/dusk/activity_monitor.svg",
+		"categories": ["Development"],
+		"comment": "Monitor HELLO voice agents in real-time"
+	},
+	"tauri": {
+		"exportable": false
+	}
+}

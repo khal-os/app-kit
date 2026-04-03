@@ -1,0 +1,40 @@
+{
+	"schemaVersion": 1,
+	"id": "files-app",
+	"name": "Files",
+	"version": "1.0.0",
+	"description": "File browser for KhalOS — browse, upload, and manage files across your organization.",
+	"author": "Namastex",
+	"license": "Elastic-2.0",
+	"repository": "https://github.com/khal-os/app-kit",
+	"views": [
+		{
+			"id": "files",
+			"label": "Files",
+			"permission": "files",
+			"minRole": "member",
+			"natsPrefix": "fs",
+			"defaultSize": { "width": 800, "height": 600 },
+			"component": "./views/files/FilesApp"
+		}
+	],
+	"desktop": {
+		"icon": "/icons/dusk/finder.svg",
+		"categories": ["System"],
+		"comment": "File browser"
+	},
+	"deploy": {
+		"port": 3000,
+		"resources": {
+			"requests": { "cpu": "100m", "memory": "128Mi" },
+			"limits": { "cpu": "500m", "memory": "512Mi" }
+		},
+		"healthPath": "/api/health",
+		"ingress": { "subdomain": "files" }
+	},
+	"tauri": {
+		"exportable": true,
+		"appName": "KhalOS Files",
+		"window": { "width": 800, "height": 600, "title": "Files" }
+	}
+}
