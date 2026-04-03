@@ -105,5 +105,5 @@ function LiveFeed({
 	);
 }
 
-export type { LiveFeedProps, FeedEvent, FeedEventType };
+export type { FeedEvent, FeedEventType, LiveFeedProps };
 export { LiveFeed };

@@ -3,12 +3,12 @@
 import { EmptyState, Spinner, StatusBar } from '@khal-os/ui';
 import { AlertTriangle, FolderOpen, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { validateFilename } from './lib/filename-validation';
 import { type ContextMenuState, FilesContextMenu } from './ContextMenu';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 import { FilesListView } from './FilesListView';
 import { FilesToolbar, type ViewMode } from './FilesToolbar';
 import { GridView } from './GridView';
+import { validateFilename } from './lib/filename-validation';
 import type { FileEntry } from './schema';
 import { UploadOverlay } from './UploadOverlay';
 import { useFiles } from './use-files';
