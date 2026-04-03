@@ -1,7 +1,12 @@
 'use client';
 
-import type { KeyCombo, ModifierKey, ShortcutCategory } from '@khal-os/desktop-shell';
-import { comboToSymbols, useKeybindStore } from '@khal-os/desktop-shell';
+import {
+	comboToSymbols,
+	type KeyCombo,
+	type ModifierKey,
+	type ShortcutCategory,
+	useKeybindStore,
+} from '@khal-os/desktop-shell';
 import { SUBJECTS, useNats } from '@khal-os/sdk/app';
 import {
 	Button,

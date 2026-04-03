@@ -8,5 +8,5 @@ export default defineConfig({
 	sourcemap: true,
 	clean: true,
 	outDir: 'dist',
-	external: ['react', 'next-themes', 'zustand'],
+	external: ['react', 'next-themes', 'zustand', '@khal-os/sdk', '@khal-os/sdk/app'],
 });

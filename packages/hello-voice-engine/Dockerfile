@@ -1,16 +1,25 @@
-# hello-voice-engine — KhalOS voice engine (Python runtime)
-FROM python:3.12-slim
+# hello-voice-engine — Python voice AI runtime
+# Build from package dir: docker build -t khal-os/hello-voice-engine .
+FROM python:3.12-slim AS base
+
+# Install uv for fast dependency management
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
 WORKDIR /app
 
-COPY requirements*.txt ./
-RUN pip install --no-cache-dir -r requirements.txt 2>/dev/null || true
+# Install dependencies (lockfile-first for layer caching)
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
 
+# Copy application source
 COPY . .
 
 ENV PORT=8000
+ENV HOSTNAME=0.0.0.0
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=15s \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
 EXPOSE 8000
-CMD ["python", "main.py"]
+
+CMD ["uv", "run", "python", "bridge.py"]
