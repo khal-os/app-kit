@@ -1,0 +1,16 @@
+{
+	"schemaVersion": 2,
+	"id": "types",
+	"name": "@khal-os/types",
+	"version": "0.0.1",
+	"description": "Shared TypeScript type definitions for the KhalOS platform.",
+	"author": "Namastex",
+	"license": "Elastic-2.0",
+	"repository": "https://github.com/khal-os/app-kit",
+	"views": [],
+	"desktop": {
+		"icon": "/icons/dusk/package.svg",
+		"categories": ["Library"],
+		"comment": "KhalOS type definitions (not a standalone app)"
+	}
+}

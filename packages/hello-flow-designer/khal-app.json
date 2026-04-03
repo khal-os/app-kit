@@ -1,0 +1,69 @@
+{
+	"schemaVersion": 2,
+	"id": "hello-flow-designer",
+	"name": "Flow Designer",
+	"version": "1.0.0",
+	"description": "Visual voice agent flow builder \u2014 drag-and-drop conversation design.",
+	"author": "Namastex",
+	"license": "Elastic-2.0",
+	"repository": "https://github.com/khal-os/app-kit",
+	"views": [
+		{
+			"id": "flow-designer",
+			"label": "Flow Designer",
+			"permission": "hello-flows",
+			"minRole": "platform-dev",
+			"natsPrefix": "hello.flows",
+			"defaultSize": {
+				"width": 1200,
+				"height": 800
+			},
+			"component": "./views/flow-designer/ui/FlowDesignerApp"
+		}
+	],
+	"desktop": {
+		"icon": "/icons/dusk/electron.svg",
+		"categories": ["Development"],
+		"comment": "Visual voice agent flow builder"
+	},
+	"services": [
+		{
+			"name": "hello-flow-designer",
+			"entry": "./views/flow-designer/service/index.ts",
+			"runtime": "node",
+			"health": {
+				"type": "tcp",
+				"target": 3000,
+				"interval": 30000,
+				"timeout": 5000
+			},
+			"ports": [3000]
+		}
+	],
+	"deploy": {
+		"port": 3000,
+		"resources": {
+			"requests": {
+				"cpu": "100m",
+				"memory": "128Mi"
+			},
+			"limits": {
+				"cpu": "500m",
+				"memory": "512Mi"
+			}
+		},
+		"healthPath": "/api/health",
+		"ingress": {
+			"subdomain": "flow-designer"
+		}
+	},
+	"tauri": {
+		"exportable": true,
+		"appName": "Flow Designer",
+		"window": {
+			"width": 1200,
+			"height": 800,
+			"title": "Flow Designer"
+		}
+	}
+}

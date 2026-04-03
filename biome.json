@@ -80,17 +80,11 @@
 		}
 	},
 	"files": {
-		"includes": [
-			"**",
-			"!node_modules/**",
-			"!**/dist/**"
-		]
+		"includes": ["**", "!node_modules/**", "!**/dist/**"]
 	},
 	"overrides": [
 		{
-			"includes": [
-				"**/service/**"
-			],
+			"includes": ["**/service/**", "**/runtime/**"],
 			"linter": {
 				"rules": {
 					"suspicious": {

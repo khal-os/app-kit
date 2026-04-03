@@ -13,7 +13,8 @@
 	},
 	"dependencies": {
 		"@khal-os/sdk": "workspace:*",
-		"@khal-os/ui": "workspace:*"
+		"@khal-os/ui": "workspace:*",
+		"lucide-react": "^0.563.0"
 	},
 	"devDependencies": {
 		"chart.js": "^4.4.0",

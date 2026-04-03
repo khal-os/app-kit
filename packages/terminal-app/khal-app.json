@@ -1,0 +1,72 @@
+{
+	"schemaVersion": 2,
+	"id": "terminal-app",
+	"name": "Terminal",
+	"version": "1.0.0",
+	"description": "Terminal emulator for KhalOS \u2014 multi-tab PTY sessions with NATS transport.",
+	"author": "Namastex",
+	"license": "Elastic-2.0",
+	"repository": "https://github.com/khal-os/app-kit",
+	"views": [
+		{
+			"id": "terminal",
+			"label": "Terminal",
+			"permission": "terminal",
+			"minRole": "platform-dev",
+			"natsPrefix": "pty",
+			"defaultSize": {
+				"width": 720,
+				"height": 480
+			},
+			"component": "./views/terminal/ui/MultiTerminalApp"
+		}
+	],
+	"desktop": {
+		"icon": "/icons/dusk/terminal.svg",
+		"categories": ["System"],
+		"comment": "Terminal emulator"
+	},
+	"services": [
+		{
+			"name": "pty",
+			"entry": "./views/terminal/service/index.ts",
+			"runtime": "node",
+			"health": {
+				"type": "tcp",
+				"target": 3000,
+				"interval": 30000,
+				"timeout": 5000
+			},
+			"ports": [3000]
+		}
+	],
+	"deploy": {
+		"port": 3000,
+		"buildArgs": {
+			"EXTRA_PACKAGES": "python3 make g++"
+		},
+		"resources": {
+			"requests": {
+				"cpu": "100m",
+				"memory": "128Mi"
+			},
+			"limits": {
+				"cpu": "500m",
+				"memory": "512Mi"
+			}
+		},
+		"healthPath": "/api/health",
+		"ingress": {
+			"subdomain": "terminal"
+		}
+	},
+	"tauri": {
+		"exportable": true,
+		"appName": "KhalOS Terminal",
+		"window": {
+			"width": 720,
+			"height": 480,
+			"title": "Terminal"
+		}
+	}
+}

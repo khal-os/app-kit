@@ -3,7 +3,7 @@
 import { EmptyState, Spinner, StatusBar } from '@khal-os/ui';
 import { AlertTriangle, FolderOpen, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { validateFilename } from '@/lib/files/filename-validation';
+import { validateFilename } from '../../lib/filename-validation';
 import { type ContextMenuState, FilesContextMenu } from './ContextMenu';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 import { FilesListView } from './FilesListView';

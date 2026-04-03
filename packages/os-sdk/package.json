@@ -7,7 +7,8 @@
 		".": "./src/index.ts",
 		"./app": "./src/app/index.ts",
 		"./app/roles": "./src/app/roles.ts",
-		"./app/subjects": "./src/app/subjects.ts"
+		"./app/subjects": "./src/app/subjects.ts",
+		"./runtime": "./src/runtime/index.ts"
 	},
 	"files": [
 		"dist",
@@ -28,6 +29,9 @@
 	},
 	"dependencies": {
 		"@khal-os/types": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": ">=20"
 	},
 	"publishConfig": {
 		"access": "public",

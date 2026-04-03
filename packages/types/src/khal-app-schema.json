@@ -1,0 +1,201 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://khal.ai/schemas/khal-app.json",
+	"title": "KhalOS App Manifest",
+	"description": "Universal manifest for KhalOS apps — the install-time contract that the marketplace reads.",
+	"type": "object",
+	"required": ["id", "views", "desktop"],
+	"additionalProperties": true,
+	"properties": {
+		"schemaVersion": {
+			"type": "number",
+			"description": "Schema version for forward compatibility.",
+			"default": 1
+		},
+		"id": {
+			"type": "string",
+			"description": "Unique app identifier (must match the package directory name).",
+			"pattern": "^[a-z0-9][a-z0-9-]*$"
+		},
+		"name": {
+			"type": "string",
+			"description": "Human-readable app name."
+		},
+		"version": {
+			"type": "string",
+			"description": "Semantic version of the app."
+		},
+		"description": {
+			"type": "string",
+			"description": "Short description for the marketplace listing."
+		},
+		"author": {
+			"type": "string",
+			"description": "Author name or organization."
+		},
+		"license": {
+			"type": "string",
+			"description": "SPDX license identifier."
+		},
+		"repository": {
+			"type": "string",
+			"description": "Source repository URL.",
+			"format": "uri"
+		},
+		"minHostVersion": {
+			"type": "string",
+			"description": "Minimum KhalOS host version required."
+		},
+		"views": {
+			"type": "array",
+			"description": "One or more views the app exposes.",
+			"items": {
+				"type": "object",
+				"required": ["id", "label", "permission", "minRole", "defaultSize", "component"],
+				"properties": {
+					"id": { "type": "string" },
+					"label": { "type": "string" },
+					"permission": { "type": "string" },
+					"minRole": { "type": "string", "enum": ["member", "platform-dev", "platform-admin", "platform-owner"] },
+					"natsPrefix": { "type": "string" },
+					"defaultSize": {
+						"type": "object",
+						"required": ["width", "height"],
+						"properties": {
+							"width": { "type": "number" },
+							"height": { "type": "number" }
+						}
+					},
+					"component": { "type": "string" }
+				}
+			}
+		},
+		"desktop": {
+			"type": "object",
+			"required": ["icon", "categories", "comment"],
+			"properties": {
+				"icon": { "type": "string", "description": "Path to the app icon." },
+				"categories": { "type": "array", "items": { "type": "string" } },
+				"comment": { "type": "string", "description": "Short description for desktop launcher." }
+			}
+		},
+		"services": {
+			"type": "array",
+			"description": "Backend services this app runs.",
+			"items": {
+				"type": "object",
+				"required": ["name"],
+				"properties": {
+					"name": { "type": "string" },
+					"command": { "type": "string" },
+					"entry": { "type": "string" },
+					"runtime": { "type": "string", "enum": ["node", "python"] },
+					"health": {
+						"type": "object",
+						"required": ["type", "target"],
+						"properties": {
+							"type": { "type": "string", "enum": ["tcp", "http", "command"] },
+							"target": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+							"interval": { "type": "number" },
+							"timeout": { "type": "number" }
+						}
+					},
+					"restart": { "type": "string", "enum": ["always", "on-failure", "never"] },
+					"ports": { "type": "array", "items": { "type": "number" } }
+				}
+			}
+		},
+		"env": {
+			"type": "array",
+			"description": "Environment variables the app needs.",
+			"items": {
+				"type": "object",
+				"required": ["key", "description", "required"],
+				"properties": {
+					"key": { "type": "string" },
+					"description": { "type": "string" },
+					"required": { "type": "boolean" },
+					"default": { "type": "string" },
+					"type": { "type": "string", "enum": ["string", "number", "boolean", "secret", "url"] },
+					"visibility": { "type": "string", "enum": ["config", "vault"] }
+				}
+			}
+		},
+		"deploy": {
+			"type": "object",
+			"description": "Native Kubernetes deployment configuration.",
+			"properties": {
+				"dockerfile": { "type": "string", "default": "Dockerfile" },
+				"buildArgs": { "type": "object", "additionalProperties": { "type": "string" } },
+				"port": { "type": "number" },
+				"resources": {
+					"type": "object",
+					"properties": {
+						"requests": {
+							"type": "object",
+							"properties": {
+								"cpu": { "type": "string" },
+								"memory": { "type": "string" }
+							}
+						},
+						"limits": {
+							"type": "object",
+							"properties": {
+								"cpu": { "type": "string" },
+								"memory": { "type": "string" }
+							}
+						}
+					}
+				},
+				"replicas": { "type": "number", "default": 1 },
+				"healthPath": { "type": "string" },
+				"ingress": {
+					"type": "object",
+					"properties": {
+						"subdomain": { "type": "string" },
+						"pathPrefixes": { "type": "array", "items": { "type": "string" } }
+					}
+				},
+				"autoscaling": {
+					"type": "object",
+					"required": ["enabled"],
+					"properties": {
+						"enabled": { "type": "boolean" },
+						"minReplicas": { "type": "number" },
+						"maxReplicas": { "type": "number" },
+						"targetCPU": { "type": "number" }
+					}
+				},
+				"envFrom": {
+					"type": "array",
+					"items": {
+						"type": "object",
+						"properties": {
+							"secretRef": { "type": "string" },
+							"configMapRef": { "type": "string" }
+						}
+					}
+				}
+			}
+		},
+		"tauri": {
+			"type": "object",
+			"description": "Tauri standalone export configuration.",
+			"required": ["exportable"],
+			"properties": {
+				"exportable": { "type": "boolean" },
+				"tauriDir": { "type": "string", "default": "./src-tauri" },
+				"appName": { "type": "string" },
+				"icon": { "type": "string" },
+				"window": {
+					"type": "object",
+					"properties": {
+						"width": { "type": "number" },
+						"height": { "type": "number" },
+						"title": { "type": "string" }
+					}
+				}
+			}
+		}
+	}
+}

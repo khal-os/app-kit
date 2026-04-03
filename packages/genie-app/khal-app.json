@@ -1,0 +1,68 @@
+{
+	"schemaVersion": 2,
+	"id": "genie-app",
+	"name": "Genie",
+	"version": "1.0.0",
+	"description": "Agent mission control \u2014 manage AI agents, teams, wishes, and boards.",
+	"author": "Namastex",
+	"license": "Elastic-2.0",
+	"repository": "https://github.com/khal-os/app-kit",
+	"views": [
+		{
+			"id": "genie",
+			"label": "Genie",
+			"permission": "genie",
+			"minRole": "platform-dev",
+			"natsPrefix": "genie",
+			"defaultSize": {
+				"width": 1200,
+				"height": 700
+			},
+			"component": "./views/pipeline/ui/PipelineView"
+		}
+	],
+	"services": [
+		{
+			"name": "genie-control",
+			"entry": "./views/genie/service/index.ts",
+			"runtime": "node",
+			"health": {
+				"type": "tcp",
+				"target": 4222,
+				"interval": 30000,
+				"timeout": 5000
+			}
+		}
+	],
+	"desktop": {
+		"icon": "/icons/dusk/electron.svg",
+		"categories": ["Development"],
+		"comment": "Agent mission control"
+	},
+	"deploy": {
+		"port": 3000,
+		"resources": {
+			"requests": {
+				"cpu": "200m",
+				"memory": "256Mi"
+			},
+			"limits": {
+				"cpu": "1000m",
+				"memory": "1Gi"
+			}
+		},
+		"healthPath": "/api/health",
+		"ingress": {
+			"subdomain": "genie"
+		}
+	},
+	"tauri": {
+		"exportable": true,
+		"appName": "Genie",
+		"window": {
+			"width": 1200,
+			"height": 700,
+			"title": "Genie \u2014 Agent Mission Control"
+		}
+	}
+}

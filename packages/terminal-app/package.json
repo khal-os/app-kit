@@ -21,7 +21,10 @@
 		]
 	},
 	"dependencies": {
-		"@khal-os/ui": "workspace:*"
+		"@khal-os/desktop-shell": "workspace:*",
+		"@khal-os/sdk": "workspace:*",
+		"@khal-os/ui": "workspace:*",
+		"uuid": "^11.1.0"
 	},
 	"peerDependencies": {
 		"react": ">=19"
