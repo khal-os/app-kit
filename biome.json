@@ -89,7 +89,8 @@
 	"overrides": [
 		{
 			"includes": [
-				"**/service/**"
+				"**/service/**",
+				"**/runtime/**"
 			],
 			"linter": {
 				"rules": {

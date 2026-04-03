@@ -204,6 +204,10 @@ importers:
       react:
         specifier: '>=18'
         version: 19.2.4
+    devDependencies:
+      '@types/node':
+        specifier: '>=20'
+        version: 25.5.0
 
   packages/os-ui:
     dependencies:
@@ -2580,7 +2584,6 @@ snapshots:
   '@types/node@25.5.0':
     dependencies:
       undici-types: 7.18.2
-    optional: true
 
   '@types/pg@8.20.0':
     dependencies:
@@ -3154,8 +3157,7 @@ snapshots:
 
   typescript@5.9.3: {}
 
-  undici-types@7.18.2:
-    optional: true
+  undici-types@7.18.2: {}
 
   universalify@0.1.2: {}
 

@@ -530,7 +530,7 @@ function AppsTab() {
 						installed.map((a) => ({
 							name: (a.name as string) ?? (a.id as string) ?? 'Unknown',
 							id: a.id as string,
-							hasTauri: false,
+							hasTauri: !!(a.tauri as Record<string, unknown> | undefined)?.exportable,
 							hasManifest: a.hasManifest as boolean,
 							hasDeploy: a.hasDeploy as boolean,
 							hasServices: a.hasServices as boolean,
@@ -607,17 +607,32 @@ function AppsTab() {
 		}
 	};
 
-	const handleExport = (appId: string) => {
+	const handleExport = async (appId: string) => {
+		if (!connected) return;
 		setExporting(appId);
 		setExportResult(null);
-		setTimeout(() => {
-			setExporting(null);
+		try {
+			const reply = await request('os.app.export', { appId }, 120_000);
+			const result = reply as { success: boolean; error?: string; outputPath?: string };
+			setExportResult({
+				app: appId,
+				success: result.success,
+				message: result.success
+					? `Export complete: ${result.outputPath ?? 'binary ready'}`
+					: (result.error ?? 'Export failed — check that src-tauri/ exists in the app package.'),
+			});
+		} catch (err) {
 			setExportResult({
 				app: appId,
 				success: false,
-				message: 'Tauri build requires src-tauri/ directory. Run `bun run tauri init` in the app package first.',
+				message:
+					err instanceof Error
+						? err.message
+						: 'Export request failed. Ensure the app has tauri.exportable: true in khal-app.json.',
 			});
-		}, 1000);
+		} finally {
+			setExporting(null);
+		}
 	};
 
 	const handleOpenConfig = async (appId: string) => {
@@ -720,7 +735,8 @@ function AppsTab() {
 										size="small"
 										variant="secondary"
 										onClick={() => handleExport(app.id)}
-										disabled={exporting === app.id}
+										disabled={exporting === app.id || !app.hasTauri}
+										title={app.hasTauri ? 'Export as standalone desktop app' : 'App does not support Tauri export'}
 									>
 										{exporting === app.id ? 'Exporting...' : 'Export'}
 									</Button>
