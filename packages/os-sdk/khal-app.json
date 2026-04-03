@@ -1,0 +1,16 @@
+{
+	"schemaVersion": 1,
+	"id": "os-sdk",
+	"name": "@khal-os/sdk",
+	"version": "1.0.1",
+	"description": "Shared SDK for KhalOS — runtime abstraction, NATS hooks, auth, and service helpers.",
+	"author": "Namastex",
+	"license": "Elastic-2.0",
+	"repository": "https://github.com/khal-os/app-kit",
+	"views": [],
+	"desktop": {
+		"icon": "/icons/dusk/package.svg",
+		"categories": ["Library"],
+		"comment": "KhalOS SDK library (not a standalone app)"
+	}
+}

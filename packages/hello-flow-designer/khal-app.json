@@ -23,6 +23,15 @@
 		"categories": ["Development"],
 		"comment": "Visual voice agent flow builder"
 	},
+	"services": [
+		{
+			"name": "hello-flow-designer",
+			"entry": "./views/flow-designer/service/index.ts",
+			"runtime": "node",
+			"health": { "type": "tcp", "target": 3000, "interval": 30000, "timeout": 5000 },
+			"ports": [3000]
+		}
+	],
 	"deploy": {
 		"port": 3000,
 		"resources": {

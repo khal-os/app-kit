@@ -23,6 +23,15 @@
 		"categories": ["System"],
 		"comment": "Terminal emulator"
 	},
+	"services": [
+		{
+			"name": "pty",
+			"entry": "./views/terminal/service/index.ts",
+			"runtime": "node",
+			"health": { "type": "tcp", "target": 3000, "interval": 30000, "timeout": 5000 },
+			"ports": [3000]
+		}
+	],
 	"deploy": {
 		"port": 3000,
 		"buildArgs": { "EXTRA_PACKAGES": "python3 make g++" },

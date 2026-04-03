@@ -1,0 +1,16 @@
+{
+	"schemaVersion": 1,
+	"id": "os-ui",
+	"name": "@khal-os/ui",
+	"version": "1.0.1",
+	"description": "Shared UI component library for KhalOS — buttons, panels, layouts, and theme primitives.",
+	"author": "Namastex",
+	"license": "Elastic-2.0",
+	"repository": "https://github.com/khal-os/app-kit",
+	"views": [],
+	"desktop": {
+		"icon": "/icons/dusk/package.svg",
+		"categories": ["Library"],
+		"comment": "KhalOS UI component library (not a standalone app)"
+	}
+}
