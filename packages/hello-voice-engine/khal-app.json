@@ -1,0 +1,38 @@
+{
+	"schemaVersion": 1,
+	"id": "hello-voice-engine",
+	"name": "Voice Engine",
+	"version": "1.0.0",
+	"description": "HELLO voice engine — Python-based voice AI runtime with real-time speech processing.",
+	"author": "Namastex",
+	"license": "Elastic-2.0",
+	"repository": "https://github.com/khal-os/app-kit",
+	"views": [],
+	"services": [
+		{
+			"name": "hello-voice-engine",
+			"entry": "./main.py",
+			"runtime": "python",
+			"health": { "type": "http", "target": "http://localhost:8000/health", "interval": 30000, "timeout": 5000 },
+			"ports": [8000]
+		}
+	],
+	"desktop": {
+		"icon": "/icons/dusk/voice_memos.svg",
+		"categories": ["Voice"],
+		"comment": "Voice AI runtime engine"
+	},
+	"deploy": {
+		"dockerfile": "Dockerfile",
+		"port": 8000,
+		"resources": {
+			"requests": { "cpu": "500m", "memory": "512Mi" },
+			"limits": { "cpu": "2000m", "memory": "2Gi" }
+		},
+		"healthPath": "/health",
+		"ingress": { "subdomain": "voice-engine" }
+	},
+	"tauri": {
+		"exportable": false
+	}
+}
