@@ -4,16 +4,9 @@ import { SUBJECTS, useNats } from '@khal-os/sdk/app';
 import { type DesktopNotifMode, useNotificationStore, useThemeStore } from '@khal-os/ui';
 import { Bell, Command, Info, Monitor, Package, Radio, Server } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { EmptyState, PropertyPanel, SectionHeader, SidebarNav, SplitPane, StatusBar } from '@/components/os-primitives';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Note } from '@/components/ui/note';
-import { Separator } from '@/components/ui/separator';
-import { Toggle } from '@/components/ui/switch';
-import { ThemeSwitcher } from '@/components/ui/theme-switcher';
-import type { KeyCombo, ModifierKey, ShortcutCategory } from '@/lib/keyboard/types';
-import { comboToSymbols } from '@/lib/keyboard/types';
-import { useKeybindStore } from '@/stores/keybind-store';
+import { Button, EmptyState, Input, Note, PropertyPanel, SectionHeader, Separator, SidebarNav, SplitPane, StatusBar, ThemeSwitcher, Toggle } from '@khal-os/ui';
+import type { KeyCombo, ModifierKey, ShortcutCategory } from '@khal-os/desktop-shell';
+import { comboToSymbols, useKeybindStore } from '@khal-os/desktop-shell';
 
 const IS_DEV = process.env.NODE_ENV === 'development';
 
