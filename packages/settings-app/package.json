@@ -12,7 +12,10 @@
 		"./views/*": "./views/*"
 	},
 	"dependencies": {
-		"@khal-os/ui": "workspace:*"
+		"@khal-os/desktop-shell": "workspace:*",
+		"@khal-os/sdk": "workspace:*",
+		"@khal-os/ui": "workspace:*",
+		"lucide-react": "^0.563.0"
 	},
 	"peerDependencies": {
 		"react": ">=19"

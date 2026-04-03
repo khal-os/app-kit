@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { NatsConnection } from '@khal-os/sdk/service';
 import { createService } from '@khal-os/sdk/service';
-import { getFilesRoot, resolveSafePath, validateFilename } from '@/lib/files/safe-path';
+import { getFilesRoot, resolveSafePath, validateFilename } from '../../../lib/safe-path';
 import type { FileWriteRequest, FsListRequest, FsWatchEvent } from '../schema';
 
 const MAX_ENTRIES = 500;
