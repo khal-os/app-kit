@@ -1,9 +1,9 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "files-app",
 	"name": "Files",
 	"version": "1.0.0",
-	"description": "File browser for KhalOS — browse, upload, and manage files across your organization.",
+	"description": "File browser for KhalOS \u2014 browse, upload, and manage files across your organization.",
 	"author": "Namastex",
 	"license": "Elastic-2.0",
 	"repository": "https://github.com/khal-os/app-kit",
@@ -14,7 +14,10 @@
 			"permission": "files",
 			"minRole": "member",
 			"natsPrefix": "fs",
-			"defaultSize": { "width": 800, "height": 600 },
+			"defaultSize": {
+				"width": 800,
+				"height": 600
+			},
 			"component": "./views/files/FilesApp"
 		}
 	],
@@ -28,22 +31,39 @@
 			"name": "fs",
 			"entry": "./views/files/service/index.ts",
 			"runtime": "node",
-			"health": { "type": "tcp", "target": 3000, "interval": 30000, "timeout": 5000 },
+			"health": {
+				"type": "tcp",
+				"target": 3000,
+				"interval": 30000,
+				"timeout": 5000
+			},
 			"ports": [3000]
 		}
 	],
 	"deploy": {
 		"port": 3000,
 		"resources": {
-			"requests": { "cpu": "100m", "memory": "128Mi" },
-			"limits": { "cpu": "500m", "memory": "512Mi" }
+			"requests": {
+				"cpu": "100m",
+				"memory": "128Mi"
+			},
+			"limits": {
+				"cpu": "500m",
+				"memory": "512Mi"
+			}
 		},
 		"healthPath": "/api/health",
-		"ingress": { "subdomain": "files" }
+		"ingress": {
+			"subdomain": "files"
+		}
 	},
 	"tauri": {
 		"exportable": true,
 		"appName": "KhalOS Files",
-		"window": { "width": 800, "height": 600, "title": "Files" }
+		"window": {
+			"width": 800,
+			"height": 600,
+			"title": "Files"
+		}
 	}
 }

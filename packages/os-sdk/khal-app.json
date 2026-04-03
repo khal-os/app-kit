@@ -1,9 +1,9 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
 	"id": "os-sdk",
 	"name": "@khal-os/sdk",
 	"version": "1.0.1",
-	"description": "Shared SDK for KhalOS — runtime abstraction, NATS hooks, auth, and service helpers.",
+	"description": "Shared SDK for KhalOS \u2014 runtime abstraction, NATS hooks, auth, and service helpers.",
 	"author": "Namastex",
 	"license": "Elastic-2.0",
 	"repository": "https://github.com/khal-os/app-kit",

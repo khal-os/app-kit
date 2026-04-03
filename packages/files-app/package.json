@@ -21,6 +21,7 @@
 		]
 	},
 	"dependencies": {
+		"@khal-os/sdk": "workspace:*",
 		"@khal-os/ui": "workspace:*"
 	},
 	"peerDependencies": {

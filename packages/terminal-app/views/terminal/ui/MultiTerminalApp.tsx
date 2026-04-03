@@ -1,9 +1,9 @@
 'use client';
 
+import { useWindowStore } from '@khal-os/desktop-shell';
 import { getNatsClient, SUBJECTS } from '@khal-os/sdk/app';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuid } from 'uuid';
-import { useWindowStore } from '@khal-os/desktop-shell';
 import type { SplitNode, TerminalTab } from '../types';
 import { SplitPaneRenderer } from './SplitPaneRenderer';
 import { TerminalTabBar } from './TerminalTabBar';
