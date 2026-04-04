@@ -156,9 +156,7 @@ function validateViews(views: unknown[], errors: string[]): void {
 
 		if (view.minRole !== undefined) {
 			if (typeof view.minRole !== 'string' || !(VALID_ROLES as readonly string[]).includes(view.minRole)) {
-				errors.push(
-					`views[${i}].minRole: must be one of ${VALID_ROLES.join(', ')} (got "${String(view.minRole)}")`,
-				);
+				errors.push(`views[${i}].minRole: must be one of ${VALID_ROLES.join(', ')} (got "${String(view.minRole)}")`);
 			}
 		}
 
@@ -225,18 +223,15 @@ function validateServices(services: unknown[], errors: string[]): void {
 		if (svc.runtime !== undefined) {
 			if (typeof svc.runtime !== 'string' || !(VALID_RUNTIMES as readonly string[]).includes(svc.runtime)) {
 				errors.push(
-					`services[${i}].runtime: must be one of ${VALID_RUNTIMES.join(', ')} (got "${String(svc.runtime)}")`,
+					`services[${i}].runtime: must be one of ${VALID_RUNTIMES.join(', ')} (got "${String(svc.runtime)}")`
 				);
 			}
 		}
 
 		if (svc.restart !== undefined) {
-			if (
-				typeof svc.restart !== 'string' ||
-				!(VALID_RESTART_POLICIES as readonly string[]).includes(svc.restart)
-			) {
+			if (typeof svc.restart !== 'string' || !(VALID_RESTART_POLICIES as readonly string[]).includes(svc.restart)) {
 				errors.push(
-					`services[${i}].restart: must be one of ${VALID_RESTART_POLICIES.join(', ')} (got "${String(svc.restart)}")`,
+					`services[${i}].restart: must be one of ${VALID_RESTART_POLICIES.join(', ')} (got "${String(svc.restart)}")`
 				);
 			}
 		}
@@ -316,9 +311,7 @@ function validateEnv(env: unknown[], errors: string[]): void {
 
 		if (envVar.type !== undefined) {
 			if (typeof envVar.type !== 'string' || !(VALID_ENV_TYPES as readonly string[]).includes(envVar.type)) {
-				errors.push(
-					`env[${i}].type: must be one of ${VALID_ENV_TYPES.join(', ')} (got "${String(envVar.type)}")`,
-				);
+				errors.push(`env[${i}].type: must be one of ${VALID_ENV_TYPES.join(', ')} (got "${String(envVar.type)}")`);
 			}
 		}
 
@@ -328,7 +321,7 @@ function validateEnv(env: unknown[], errors: string[]): void {
 				!(VALID_VISIBILITY as readonly string[]).includes(envVar.visibility)
 			) {
 				errors.push(
-					`env[${i}].visibility: must be one of ${VALID_VISIBILITY.join(', ')} (got "${String(envVar.visibility)}")`,
+					`env[${i}].visibility: must be one of ${VALID_VISIBILITY.join(', ')} (got "${String(envVar.visibility)}")`
 				);
 			}
 		}

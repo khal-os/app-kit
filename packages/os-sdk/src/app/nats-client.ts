@@ -28,7 +28,6 @@ interface EnterpriseConfig {
 }
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 5000;
-const MAX_RECONNECT_DELAY_MS = 30_000;
 
 /**
  * Match a concrete NATS subject against a subscription pattern.
@@ -53,25 +52,17 @@ function subjectMatches(pattern: string, subject: string): boolean {
 }
 
 /**
- * Detect whether we should use Tauri Channel IPC (enterprise mode)
- * instead of browser WebSocket.
- */
-function isEnterpriseMode(): boolean {
-	return process.env.NEXT_PUBLIC_WS_URL === 'tauri-channel' || process.env.NEXT_PUBLIC_KHAL_MODE === 'enterprise';
-}
-
-/**
- * Browser-side NATS client that communicates over WebSocket.
+ * Native Tauri NATS client.
  *
- * Connects to the `/ws/nats` bridge endpoint, multiplexing subscribe,
- * publish, and request-reply operations over a single socket. Handles
- * automatic reconnection with exponential backoff.
+ * Communicates with the Rust WS relay via Tauri Channel IPC (in-process,
+ * no network). The Rust side handles the actual WebSocket connection to
+ * the remote KhalOS server. This client is the ONLY transport supported —
+ * there is no browser WebSocket fallback, no local dev mode.
  *
- * In enterprise mode, connects via Tauri Channel IPC through the Rust
- * WS relay instead of a browser WebSocket.
+ * Requires `window.__TAURI__` to be available. Throws if loaded outside
+ * a Tauri webview context.
  */
 class NatsClient {
-	private ws: WebSocket | null = null;
 	private _connected = false;
 
 	// subject -> Set of callbacks (refcounted)
@@ -83,20 +74,14 @@ class NatsClient {
 	// status change listeners
 	private statusListeners = new Set<StatusCallback>();
 
-	// reconnect state
-	private reconnectAttempt = 0;
-	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-	private intentionallyClosed = false;
-
 	// Identity scoping
 	private _orgId = '';
 	private _userId = '';
 
-	// Enterprise mode state
-	private enterpriseMode = false;
+	// Tauri connection state
 	private connId: string | null = null;
 
-	// Connection state (used primarily in enterprise mode)
+	// Connection state
 	private _connectionState: ConnectionState = 'disconnected';
 	private _stateListeners: Array<ConnectionStateListener> = [];
 
@@ -118,7 +103,7 @@ class NatsClient {
 		return this._userId;
 	}
 
-	/** Current connection state (enterprise mode provides richer states). */
+	/** Current connection state. */
 	get connectionState(): ConnectionState {
 		return this._connectionState;
 	}
@@ -209,67 +194,25 @@ class NatsClient {
 
 	private connect(): void {
 		if (typeof window === 'undefined') return;
-
-		if (isEnterpriseMode()) {
-			this.connectViaTauri();
-			return;
-		}
-
-		this.connectViaWebSocket();
-	}
-
-	/** Connect via browser WebSocket (local mode — original behavior). */
-	private connectViaWebSocket(): void {
-		const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-		const envUrl = process.env.NEXT_PUBLIC_WS_URL;
-		const url = envUrl || `${wsProtocol}//${window.location.host}/ws/nats`;
-
-		const ws = new WebSocket(url);
-		this.ws = ws;
-
-		ws.addEventListener('open', () => {
-			this.reconnectAttempt = 0;
-			this.setConnected(true);
-			this.setConnectionState('connected');
-			// Re-subscribe all active subjects
-			for (const subject of this.subscribers.keys()) {
-				this.sendFrame({ op: 'sub', subject });
-			}
-		});
-
-		ws.addEventListener('message', (event) => {
-			this.handleMessage(event.data);
-		});
-
-		ws.addEventListener('close', () => {
-			this.setConnected(false);
-			this.setConnectionState('disconnected');
-			this.ws = null;
-			if (!this.intentionallyClosed) {
-				this.scheduleReconnect();
-			}
-		});
-
-		ws.addEventListener('error', () => {
-			// The close event will fire after error, so reconnect is handled there.
-		});
+		this.connectViaTauri();
 	}
 
 	/**
-	 * Connect via Tauri Channel IPC (enterprise mode).
-	 * Uses the Rust WS relay to connect to the remote server.
+	 * Connect via Tauri Channel IPC.
+	 * Uses the Rust WS relay to connect to the remote KhalOS server.
+	 * Throws if Tauri IPC is not available (e.g., loaded outside a Tauri webview).
 	 */
 	private async connectViaTauri(): Promise<void> {
-		try {
-			const tauri = (window as TauriGlobal).__TAURI__;
-			if (!tauri?.core) {
-				throw new Error('Tauri IPC not available');
-			}
+		const tauri = (window as TauriGlobal).__TAURI__;
+		if (!tauri?.core) {
+			throw new Error('[nats-client] Tauri IPC not available. This SDK only runs inside the Khal OS desktop app.');
+		}
 
-			// Get auth config from Tauri (stored in Rust AppState by Group 6)
+		try {
+			// Get auth config from Tauri (stored in Rust AppState)
 			const config = (await tauri.core.invoke('get_enterprise_config')) as EnterpriseConfig | null;
 			if (!config) {
-				throw new Error('Enterprise config not available');
+				throw new Error('Enterprise config not available — user is not signed in');
 			}
 
 			// Create a Tauri Channel for receiving messages from the Rust relay
@@ -312,12 +255,11 @@ class NatsClient {
 			})) as string;
 
 			this.connId = connId;
-			this.enterpriseMode = true;
 			this.setConnected(true);
 			this.setConnectionState('connected');
 		} catch (err) {
 			// biome-ignore lint/suspicious/noConsole: connection error logging
-			console.error('[nats-client] enterprise connection failed:', err);
+			console.error('[nats-client] connection failed:', err);
 			this.setConnectionState('disconnected');
 		}
 	}
@@ -378,25 +320,15 @@ class NatsClient {
 		}
 	}
 
-	/**
-	 * Send a JSON frame. Routes through Tauri IPC in enterprise mode,
-	 * or through the browser WebSocket in local mode.
-	 */
+	/** Send a JSON frame via Tauri Channel IPC to the Rust WS relay. */
 	private sendFrame(frame: Record<string, unknown>): void {
-		const data = JSON.stringify(frame);
+		if (!this.connId) return;
 
-		if (this.enterpriseMode && this.connId) {
-			const tauri = (window as TauriGlobal).__TAURI__;
-			tauri?.core?.invoke('send_enterprise_ws', {
-				connId: this.connId,
-				data,
-			});
-			return;
-		}
-
-		if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-			this.ws.send(data);
-		}
+		const tauri = (window as TauriGlobal).__TAURI__;
+		tauri?.core?.invoke('send_enterprise_ws', {
+			connId: this.connId,
+			data: JSON.stringify(frame),
+		});
 	}
 
 	private setConnected(value: boolean): void {
@@ -420,18 +352,6 @@ class NatsClient {
 				// Protect against listener errors.
 			}
 		}
-	}
-
-	private scheduleReconnect(): void {
-		if (this.reconnectTimer) return;
-
-		const delay = Math.min(1000 * 2 ** this.reconnectAttempt, MAX_RECONNECT_DELAY_MS);
-		this.reconnectAttempt++;
-
-		this.reconnectTimer = setTimeout(() => {
-			this.reconnectTimer = null;
-			this.connect();
-		}, delay);
 	}
 }
 
@@ -458,7 +378,7 @@ interface TauriGlobal {
 // Singleton
 let instance: NatsClient | null = null;
 
-/** Get the singleton browser NATS client. Creates the instance (and connects) on first call. */
+/** Get the singleton NATS client. Creates the instance (and connects) on first call. */
 export function getNatsClient(): NatsClient {
 	if (!instance) {
 		instance = new NatsClient();
