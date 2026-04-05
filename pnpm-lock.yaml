@@ -145,6 +145,12 @@ importers:
 
   packages/hello-flow-designer:
     dependencies:
+      '@khal-os/sdk':
+        specifier: workspace:*
+        version: link:../os-sdk
+      '@khal-os/ui':
+        specifier: workspace:*
+        version: link:../os-ui
       '@monaco-editor/react':
         specifier: ^4.7.0
         version: 4.7.0(monaco-editor@0.52.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
