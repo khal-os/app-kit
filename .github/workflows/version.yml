@@ -5,8 +5,9 @@
 #   2. workflow_dispatch — manual bump with choice of patch/minor/major
 #
 # Paths:
-#   dev  → patch bump → publish @next to both registries
-#   main → minor bump → publish @latest to both registries + GitHub Release
+#   dev  → patch bump → commit → publish @next to both registries
+#   main → read version (set by dev→main PR) → tag → publish @latest + GitHub Release
+#         (no commit push to main — branch protection respected)
 #   dispatch → user-chosen bump, branch determines tag behaviour
 #
 # Secrets required:
@@ -97,31 +98,46 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      # ── Version bump (all public packages) ─────────────────────
-      - name: Bump versions
-        id: bump
+      # ── Version bump (dev) or read version (main) ─────────────
+      - name: Bump versions (dev only)
+        if: steps.context.outputs.branch != 'main'
+        id: bump_dev
         run: |
           BUMP="${{ steps.context.outputs.bump }}"
-          BRANCH="${{ steps.context.outputs.branch }}"
 
           for PKG in os-sdk types os-ui; do
             pnpm --filter "./packages/${PKG}" exec npm version "$BUMP" --no-git-tag-version
           done
 
-          # Read the new version from sdk (all three are in lockstep)
           VERSION=$(jq -r '.version' packages/os-sdk/package.json)
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "Bumped all public packages to ${VERSION} (${BUMP})"
 
+      - name: Read version (main — already set by dev→main PR)
+        if: steps.context.outputs.branch == 'main'
+        id: bump_main
+        run: |
+          VERSION=$(jq -r '.version' packages/os-sdk/package.json)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Main path: using existing version ${VERSION} (no bump — branch protection respected)"
+
+      - name: Set version output
+        id: bump
+        run: |
+          VERSION="${{ steps.bump_dev.outputs.version || steps.bump_main.outputs.version }}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
       - name: Format package.json files
+        if: steps.context.outputs.branch != 'main'
         run: |
           pnpm biome format --write \
             packages/os-sdk/package.json \
             packages/types/package.json \
             packages/os-ui/package.json
 
-      # ── Commit, tag, push ──────────────────────────────────────
-      - name: Commit version bump
+      # ── Commit (dev only), tag, push ───────────────────────────
+      - name: Commit version bump (dev only)
+        if: steps.context.outputs.branch != 'main'
         run: |
           VERSION="${{ steps.bump.outputs.version }}"
           BUMP="${{ steps.context.outputs.bump }}"
@@ -142,27 +158,42 @@ jobs:
           TAGS=""
           for PKG in os-sdk types os-ui; do
             TAG="${PKG}-v${VERSION}"
-            git tag "$TAG"
-            TAGS="${TAGS} refs/tags/${TAG}"
+            if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+              git tag "$TAG"
+              TAGS="${TAGS} refs/tags/${TAG}"
+            fi
           done
 
-          # Combined tag for releases
           if [ "$BRANCH" = "main" ]; then
-            git tag "v${VERSION}"
-            TAGS="${TAGS} refs/tags/v${VERSION}"
+            TAG="v${VERSION}"
           else
-            git tag "dev-v${VERSION}"
-            TAGS="${TAGS} refs/tags/dev-v${VERSION}"
+            TAG="dev-v${VERSION}"
+          fi
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag "$TAG"
+            TAGS="${TAGS} refs/tags/${TAG}"
           fi
 
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
           echo "Created tags:${TAGS}"
 
-      - name: Push commit and tags
+      - name: Push commit and tags (dev)
+        if: steps.context.outputs.branch != 'main'
         run: |
           BRANCH="${{ steps.context.outputs.branch }}"
           TAGS="${{ steps.tags.outputs.tags }}"
           git push --atomic origin "HEAD:refs/heads/${BRANCH}" ${TAGS}
+
+      - name: Push tags only (main — no commit push)
+        if: steps.context.outputs.branch == 'main'
+        run: |
+          TAGS="${{ steps.tags.outputs.tags }}"
+          if [ -n "${TAGS}" ]; then
+            git push origin ${TAGS}
+            echo "Pushed tags:${TAGS}"
+          else
+            echo "All tags already exist — nothing to push"
+          fi
 
       # ── Build ──────────────────────────────────────────────────
       - name: Build all public packages
