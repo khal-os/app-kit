@@ -1,22 +1,36 @@
 {
 	"name": "@khal-os/ui",
-	"version": "1.0.1",
-	"private": true,
-	"scripts": {
-		"build": "tsup",
-		"typecheck": "tsc --noEmit",
-		"lint": "biome check ."
-	},
-	"main": "./src/index.ts",
+	"version": "1.0.0",
+	"type": "module",
+	"private": false,
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
 	"exports": {
-		".": "./src/index.ts",
+		".": {
+			"import": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			},
+			"require": {
+				"types": "./dist/index.d.cts",
+				"default": "./dist/index.cjs"
+			}
+		},
 		"./tokens.css": "./tokens.css"
 	},
 	"files": [
 		"dist",
-		"src",
-		"tokens.css"
+		"tokens.css",
+		"README.md",
+		"LICENSE"
 	],
+	"scripts": {
+		"build": "tsup",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check .",
+		"prepublishOnly": "pnpm run build"
+	},
 	"peerDependencies": {
 		"@khal-os/sdk": "workspace:*",
 		"react": ">=19",
