@@ -1,0 +1,264 @@
+# Version — automated version bumping, tarball audit, and dual-registry publish
+#
+# Triggers:
+#   1. workflow_run  — after CI passes on dev or main
+#   2. workflow_dispatch — manual bump with choice of patch/minor/major
+#
+# Paths:
+#   dev  → patch bump → publish @next to both registries
+#   main → minor bump → publish @latest to both registries + GitHub Release
+#   dispatch → user-chosen bump, branch determines tag behaviour
+#
+# Secrets required:
+#   NPM_TOKEN — classic automation token with publish scope on @khal-os (npmjs.org)
+#               Provision at: https://www.npmjs.com/settings/<user>/tokens
+#               Add to repo:  Settings → Secrets → Actions → NPM_TOKEN
+#   GITHUB_TOKEN — automatic, used for GitHub Packages publish (needs write:packages)
+#
+# Validation:
+#   actionlint .github/workflows/version.yml
+#   bunx action-validator .github/workflows/version.yml   (fallback)
+#   Manual review against repos/genie-brain/.github/workflows/version.yml (last resort)
+
+name: Version
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main, dev]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        type: choice
+        required: true
+        default: patch
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: version-${{ github.event.workflow_run.head_branch || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Version & Publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: >-
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       !contains(github.event.workflow_run.head_commit.message, '[skip ci]'))
+
+    steps:
+      # ── Setup ──────────────────────────────────────────────────
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch || github.ref_name }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine branch and bump
+        id: context
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch || github.ref_name }}"
+          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            BUMP="${{ inputs.bump }}"
+          elif [ "$BRANCH" = "main" ]; then
+            BUMP="minor"
+          else
+            BUMP="patch"
+          fi
+          echo "bump=${BUMP}" >> "$GITHUB_OUTPUT"
+          echo "Branch: ${BRANCH}, Bump: ${BUMP}"
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      # ── Version bump (all public packages) ─────────────────────
+      - name: Bump versions
+        id: bump
+        run: |
+          BUMP="${{ steps.context.outputs.bump }}"
+          BRANCH="${{ steps.context.outputs.branch }}"
+
+          for PKG in os-sdk types os-ui; do
+            pnpm --filter "./packages/${PKG}" exec npm version "$BUMP" --no-git-tag-version
+          done
+
+          # Read the new version from sdk (all three are in lockstep)
+          VERSION=$(jq -r '.version' packages/os-sdk/package.json)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Bumped all public packages to ${VERSION} (${BUMP})"
+
+      - name: Format package.json files
+        run: |
+          pnpm biome format --write \
+            packages/os-sdk/package.json \
+            packages/types/package.json \
+            packages/os-ui/package.json
+
+      # ── Commit, tag, push ──────────────────────────────────────
+      - name: Commit version bump
+        run: |
+          VERSION="${{ steps.bump.outputs.version }}"
+          BUMP="${{ steps.context.outputs.bump }}"
+
+          git add packages/os-sdk/package.json packages/types/package.json packages/os-ui/package.json
+          if git diff --cached --quiet; then
+            echo "No version changes to commit"
+            exit 0
+          fi
+          git commit -m "chore(version): ${BUMP} bump to ${VERSION} [skip ci]"
+
+      - name: Create tags
+        id: tags
+        run: |
+          VERSION="${{ steps.bump.outputs.version }}"
+          BRANCH="${{ steps.context.outputs.branch }}"
+
+          TAGS=""
+          for PKG in os-sdk types os-ui; do
+            TAG="${PKG}-v${VERSION}"
+            git tag "$TAG"
+            TAGS="${TAGS} refs/tags/${TAG}"
+          done
+
+          # Combined tag for releases
+          if [ "$BRANCH" = "main" ]; then
+            git tag "v${VERSION}"
+            TAGS="${TAGS} refs/tags/v${VERSION}"
+          else
+            git tag "dev-v${VERSION}"
+            TAGS="${TAGS} refs/tags/dev-v${VERSION}"
+          fi
+
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+          echo "Created tags:${TAGS}"
+
+      - name: Push commit and tags
+        run: |
+          BRANCH="${{ steps.context.outputs.branch }}"
+          TAGS="${{ steps.tags.outputs.tags }}"
+          git push --atomic origin "HEAD:refs/heads/${BRANCH}" ${TAGS}
+
+      # ── Build ──────────────────────────────────────────────────
+      - name: Build all public packages
+        run: |
+          for PKG in os-sdk types os-ui; do
+            pnpm --filter "./packages/${PKG}" run build
+          done
+
+      # ── Tarball audit (HARD GATE) ─────────────────────────────
+      # Fails the build if ANY .ts file (excluding .d.ts) from src/ appears
+      # in the tarball. Source leak is non-recoverable once published.
+      - name: Tarball audit
+        run: |
+          set -euo pipefail
+          FAILED=0
+
+          for PKG in os-sdk types os-ui; do
+            echo "::group::Auditing @khal-os/${PKG}"
+            FILES=$(cd "packages/${PKG}" && pnpm pack --dry-run 2>&1 || true)
+            echo "$FILES"
+
+            # Check for source .ts files (not .d.ts)
+            LEAKED=$(echo "$FILES" | grep -E 'src/.*\.ts$' | grep -v '\.d\.ts$' || true)
+            if [ -n "$LEAKED" ]; then
+              echo "::error::SOURCE LEAK DETECTED in @khal-os/${PKG}:"
+              echo "$LEAKED"
+              FAILED=1
+            else
+              echo "Clean — no source .ts files in tarball"
+            fi
+            echo "::endgroup::"
+          done
+
+          if [ "$FAILED" -ne 0 ]; then
+            echo "::error::Tarball audit FAILED — source .ts files detected. Publishing blocked."
+            exit 1
+          fi
+          echo "Tarball audit passed for all packages"
+
+      # ── Publish to npmjs.org ───────────────────────────────────
+      - name: Publish to npmjs.org
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          BRANCH="${{ steps.context.outputs.branch }}"
+
+          # Configure npmjs.org registry for @khal-os scope
+          echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" > ~/.npmrc
+          echo "@khal-os:registry=https://registry.npmjs.org" >> ~/.npmrc
+
+          for PKG in os-sdk types os-ui; do
+            echo "::group::Publishing @khal-os/${PKG} to npmjs.org"
+            if [ "$BRANCH" = "main" ]; then
+              pnpm --filter "./packages/${PKG}" publish --access public --no-git-checks --registry https://registry.npmjs.org
+            else
+              pnpm --filter "./packages/${PKG}" publish --access public --tag next --no-git-checks --registry https://registry.npmjs.org
+            fi
+            echo "::endgroup::"
+          done
+
+      # ── Publish to GitHub Packages ─────────────────────────────
+      - name: Publish to GitHub Packages
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${{ steps.context.outputs.branch }}"
+
+          # Configure GitHub Packages registry for @khal-os scope
+          echo "//npm.pkg.github.com/:_authToken=\${NODE_AUTH_TOKEN}" > ~/.npmrc
+          echo "@khal-os:registry=https://npm.pkg.github.com" >> ~/.npmrc
+
+          for PKG in os-sdk types os-ui; do
+            echo "::group::Publishing @khal-os/${PKG} to GitHub Packages"
+            if [ "$BRANCH" = "main" ]; then
+              pnpm --filter "./packages/${PKG}" publish --no-git-checks --registry https://npm.pkg.github.com
+            else
+              pnpm --filter "./packages/${PKG}" publish --tag next --no-git-checks --registry https://npm.pkg.github.com
+            fi
+            echo "::endgroup::"
+          done
+
+      # ── GitHub Release (main only) ────────────────────────────
+      - name: Create GitHub Release
+        if: steps.context.outputs.branch == 'main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.bump.outputs.version }}"
+          TAG="v${VERSION}"
+
+          if gh release view "${TAG}" > /dev/null 2>&1; then
+            echo "Release ${TAG} already exists — skipping"
+          else
+            gh release create "${TAG}" \
+              --target main \
+              --title "${TAG}" \
+              --generate-notes
+            echo "Created release ${TAG}"
+          fi
