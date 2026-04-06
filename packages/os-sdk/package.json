@@ -37,6 +37,16 @@
 				"default": "./dist/app/roles.cjs"
 			}
 		},
+		"./app/registry": {
+			"import": {
+				"types": "./dist/app/app-registry.d.ts",
+				"default": "./dist/app/app-registry.js"
+			},
+			"require": {
+				"types": "./dist/app/app-registry.d.cts",
+				"default": "./dist/app/app-registry.cjs"
+			}
+		},
 		"./app/subjects": {
 			"import": {
 				"types": "./dist/app/subjects.d.ts",

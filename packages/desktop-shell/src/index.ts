@@ -42,6 +42,11 @@ export { WindowContent } from './components/window/WindowContent';
 export { WindowControlsOverlay } from './components/window/WindowControlsOverlay';
 export { WindowFrame } from './components/window/WindowFrame';
 export { WindowsControls } from './components/window/WindowsControls';
+export type { AppManifestInfo } from './components/window/AppSettingsPanel';
+export { AppSettingsPanel } from './components/window/AppSettingsPanel';
+// -- Pack loader --
+export type { PackModule } from './loader';
+export { loadPack, PackLoadError } from './loader';
 // -- Hooks --
 export { useDesktopNats } from './hooks/useDesktopNats';
 export { useGlobalKeybinds } from './hooks/useGlobalKeybinds';
