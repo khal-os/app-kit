@@ -51,7 +51,7 @@ concurrency:
 jobs:
   version:
     name: Version & Publish
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     if: >-
       (github.event_name == 'workflow_dispatch') ||
