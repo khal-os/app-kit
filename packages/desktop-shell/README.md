@@ -81,6 +81,44 @@ try {
 
 3. The desktop runtime calls `loadPack("@my-org/pack-my-app")` when the user opens the app.
 
+## Creating a new `pack-*` repo
+
+Each first-party app lives in its own `khal-os/pack-<name>` repository, scaffolded from the canonical template.
+
+### 1. Create the repo
+
+```bash
+gh repo create khal-os/pack-<name> --template khal-os/pack-template --private
+git clone git@github.com:khal-os/pack-<name>.git
+cd pack-<name>
+```
+
+### 2. Post-create checklist
+
+- [ ] **Rename the npm package** — edit `package/package.json`: set `name` to `@khal-os/pack-<name>`
+- [ ] **Fill the manifest** — edit `khal-app.json` at the repo root with your app's `id`, `name`, `icon`, `description`, `permissions`, and `frontend.package`
+- [ ] **Implement the entry component** — replace the placeholder in `package/src/index.tsx` with your app's default export (`({ manifest, sdk }) => JSX.Element`)
+- [ ] **Delete `service/` if frontend-only** — if your pack has no backend pod, remove the entire `service/` directory and the `backend` section from `khal-app.json`
+- [ ] **Update Helm values** — if keeping `service/`, edit `helm/values.yaml` with the correct image repository (`ghcr.io/khal-os/pack-<name>-service`) and environment variables
+- [ ] **Update `README.md`** — replace the template README with your app's documentation
+- [ ] **Create `dev` branch** — `git checkout -b dev && git push -u origin dev` (all subsequent PRs target `dev`)
+
+### 3. Verify
+
+```bash
+cd package && bun install && bun run typecheck && bun run lint && bun run test
+```
+
+### 4. Manifest schema
+
+The `khal-app.json` manifest is validated by `KhalAppManifest` from `@khal-os/types`. See [`packages/types/src/manifest.ts`](../types/src/manifest.ts) for the full schema and `validateManifest()` function.
+
+### 5. How the loader works
+
+`desktop-shell/src/loader.ts` dynamically imports a pack module, reads its `manifest` export, validates it with `validateManifest()`, and returns `{ default, manifest }`. If validation fails, it throws a `PackLoadError`.
+
+For more details on the pack architecture, see the [KhalOS docs](https://github.com/khal-os/docs) pack section.
+
 ## Exports
 
 ### Components
