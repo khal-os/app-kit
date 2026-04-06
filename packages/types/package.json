@@ -1,6 +1,6 @@
 {
 	"name": "@khal-os/types",
-	"version": "1.0.2",
+	"version": "1.0.4",
 	"type": "module",
 	"private": false,
 	"main": "./dist/index.cjs",

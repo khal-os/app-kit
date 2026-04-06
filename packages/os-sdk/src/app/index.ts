@@ -33,6 +33,18 @@ export {
 	ROLE_HIERARCHY,
 	registerRolePermissions,
 } from './roles';
+// App Registry — RBAC data and static app manifest
+export type { AppId, AppManifestEntry, AppStoreMeta } from './app-registry';
+export {
+	APP_MANIFEST,
+	DEFAULT_ROLE_PERMISSIONS,
+	getManifestEntry,
+	getVoiceAgentSlug,
+	getVoiceLabel,
+	refreshRolePermissions,
+	registerManifestEntry,
+	SUBJECT_PERMISSIONS,
+} from './app-registry';
 // Subject builder
 export { SubjectBuilder } from './subject-builder';
 // Subjects
