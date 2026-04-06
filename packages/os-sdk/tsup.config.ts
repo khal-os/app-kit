@@ -4,6 +4,7 @@ export default defineConfig({
 	entry: {
 		index: 'src/index.ts',
 		'app/index': 'src/app/index.ts',
+		'app/app-registry': 'src/app/app-registry.ts',
 		'app/roles': 'src/app/roles.ts',
 		'app/subjects': 'src/app/subjects.ts',
 		'runtime/index': 'src/runtime/index.ts',
