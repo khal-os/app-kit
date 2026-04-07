@@ -240,11 +240,12 @@ jobs:
         run: |
           BRANCH="${{ steps.context.outputs.branch }}"
 
-          # Configure npmjs.org registry for @khal-os scope
-          echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" > ~/.npmrc
-          echo "@khal-os:registry=https://registry.npmjs.org" >> ~/.npmrc
+          # Override project .npmrc — it redirects @khal-os to GHP, but we need npmjs here
+          mv .npmrc .npmrc.bak 2>/dev/null || true
+          echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" > .npmrc
+          echo "@khal-os:registry=https://registry.npmjs.org" >> .npmrc
 
-          for PKG in types os-sdk os-ui; do
+          for PKG in types os-sdk os-ui desktop-shell; do
             echo "::group::Publishing @khal-os/${PKG} to npmjs.org"
             if [ "$BRANCH" = "main" ]; then
               pnpm --filter "./packages/${PKG}" publish --access public --no-git-checks --registry https://registry.npmjs.org
@@ -261,11 +262,11 @@ jobs:
         run: |
           BRANCH="${{ steps.context.outputs.branch }}"
 
-          # Configure GitHub Packages registry for @khal-os scope
-          echo "//npm.pkg.github.com/:_authToken=\${NODE_AUTH_TOKEN}" > ~/.npmrc
-          echo "@khal-os:registry=https://npm.pkg.github.com" >> ~/.npmrc
+          # Override project .npmrc for GHP publish
+          echo "//npm.pkg.github.com/:_authToken=\${NODE_AUTH_TOKEN}" > .npmrc
+          echo "@khal-os:registry=https://npm.pkg.github.com" >> .npmrc
 
-          for PKG in types os-sdk os-ui; do
+          for PKG in types os-sdk os-ui desktop-shell; do
             echo "::group::Publishing @khal-os/${PKG} to GitHub Packages"
             if [ "$BRANCH" = "main" ]; then
               pnpm --filter "./packages/${PKG}" publish --no-git-checks --registry https://npm.pkg.github.com
