@@ -43,6 +43,11 @@
 		"motion": "^12.38.0",
 		"uuid": "^13.0.0"
 	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/khal-os/app-kit.git",
+		"directory": "packages/desktop-shell"
+	},
 	"publishConfig": {
 		"access": "public"
 	},

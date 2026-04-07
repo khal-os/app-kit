@@ -93,6 +93,11 @@
 	"devDependencies": {
 		"@types/node": ">=20"
 	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/khal-os/app-kit.git",
+		"directory": "packages/os-sdk"
+	},
 	"publishConfig": {
 		"access": "public"
 	},
