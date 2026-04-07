@@ -60,6 +60,7 @@
 		"directory": "packages/os-ui"
 	},
 	"publishConfig": {
+		"registry": "https://registry.npmjs.org/",
 		"access": "public"
 	},
 	"license": "Elastic-2.0"
