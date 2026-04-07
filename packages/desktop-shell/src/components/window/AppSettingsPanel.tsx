@@ -153,7 +153,7 @@ function AboutTab({ appId, manifest }: { appId: string; manifest?: AppManifestIn
 
 	useEffect(() => {
 		if (!connected) return;
-		request('os.genie.apps.get', { appId })
+		request('os.apps.get', { appId })
 			.then((reply) => {
 				const data = reply as { version?: string; installed_at?: string };
 				setVersionInfo({ version: data.version, installDate: data.installed_at });

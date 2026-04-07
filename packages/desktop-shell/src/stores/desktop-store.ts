@@ -151,7 +151,7 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
 	fetchApps: async () => {
 		try {
 			const client = getNatsClient();
-			const raw = await client.request('os.genie.apps.list', undefined, 8000);
+			const raw = await client.request('os.apps.list', undefined, 8000);
 			const data = (typeof raw === 'string' ? JSON.parse(raw) : raw) as {
 				apps?: InstalledAppRow[];
 				error?: string;
