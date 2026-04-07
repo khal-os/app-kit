@@ -42,6 +42,8 @@ export interface AppManifestEntry {
 	showTabs?: boolean;
 	/** App store metadata displayed in the Settings tab. */
 	storeMeta?: AppStoreMeta;
+	/** URL to the app's pre-built ESM bundle for runtime loading by desktop. */
+	bundleUrl?: string;
 	/** Voice agent configuration. When set, the window shows a mic button (requires HELLO). */
 	voice?: {
 		/** Slug of the voice agent to connect to (registered in hello-agent-manager). */
