@@ -33,6 +33,7 @@
 		"directory": "packages/types"
 	},
 	"publishConfig": {
+		"registry": "https://registry.npmjs.org/",
 		"access": "public"
 	},
 	"license": "Elastic-2.0",

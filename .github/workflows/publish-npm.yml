@@ -1,0 +1,77 @@
+name: Publish to npm
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: publish-npm
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish sdk, ui, types to npmjs.org
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build public packages
+        run: |
+          for PKG in types os-sdk os-ui; do
+            pnpm --filter "./packages/${PKG}" run build
+          done
+
+      - name: Tarball audit
+        run: |
+          set -euo pipefail
+          FAILED=0
+
+          for PKG in types os-sdk os-ui; do
+            echo "::group::Auditing @khal-os/${PKG}"
+            FILES=$(cd "packages/${PKG}" && pnpm pack --dry-run 2>&1 || true)
+            echo "$FILES"
+
+            LEAKED=$(echo "$FILES" | grep -E 'src/.*\.ts$' | grep -v '\.d\.ts$' || true)
+            if [ -n "$LEAKED" ]; then
+              echo "::error::SOURCE LEAK DETECTED in @khal-os/${PKG}:"
+              echo "$LEAKED"
+              FAILED=1
+            else
+              echo "Clean — no source .ts files in tarball"
+            fi
+            echo "::endgroup::"
+          done
+
+          if [ "$FAILED" -ne 0 ]; then
+            echo "::error::Tarball audit FAILED — source .ts files detected. Publishing blocked."
+            exit 1
+          fi
+          echo "Tarball audit passed for all packages"
+
+      - name: Publish to npmjs.org
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for PKG in types os-sdk os-ui; do
+            echo "::group::Publishing @khal-os/${PKG}"
+            pnpm --filter "./packages/${PKG}" publish --access public --no-git-checks --registry https://registry.npmjs.org
+            echo "::endgroup::"
+          done
