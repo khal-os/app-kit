@@ -209,6 +209,21 @@ export const KhalWindowSpec = z.object({
 });
 export type KhalWindowSpec = z.infer<typeof KhalWindowSpec>;
 
+/** A single app entry within a bundle pack manifest. */
+export const KhalAppEntrySchema = z.object({
+	/** Unique app identifier within the bundle. */
+	id: z.string(),
+	/** Human-readable app name. */
+	name: z.string(),
+	/** Frontend package reference for this app. */
+	frontend: z
+		.object({
+			package: z.string(),
+		})
+		.optional(),
+});
+export type KhalAppEntry = z.infer<typeof KhalAppEntrySchema>;
+
 export const KhalAppManifestSchema = z
 	.object({
 		$schema: z.string().optional(),
@@ -235,6 +250,11 @@ export const KhalAppManifestSchema = z
 				ports: z.array(z.number()),
 			})
 			.optional(),
+		/**
+		 * When apps is present, the root frontend field is ignored —
+		 * each entry has its own frontend.
+		 */
+		apps: z.array(KhalAppEntrySchema).optional(),
 	})
 	.strict();
 
