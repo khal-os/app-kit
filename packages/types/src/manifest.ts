@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { Role } from './roles';
 
 /** Desktop integration metadata for an app. */
@@ -166,4 +167,104 @@ export interface AppManifest {
 	deploy?: AppDeployConfig;
 	/** Tauri standalone export configuration. */
 	tauri?: AppTauriConfig;
+	/** URL to the app's pre-built ESM bundle for runtime loading by desktop. */
+	bundleUrl?: string;
+}
+
+// ── Pack Contract Types (for standalone pack-* repos) ──
+
+export const KhalPermission = z.enum([
+	'nats:publish',
+	'nats:subscribe',
+	'files:read',
+	'files:write',
+	'pty:spawn',
+	'http:fetch',
+	'system:clipboard',
+	'system:notifications',
+]);
+export type KhalPermission = z.infer<typeof KhalPermission>;
+
+export const KhalServiceSpec = z.object({
+	name: z.string(),
+	command: z.string().optional(),
+	entry: z.string().optional(),
+	runtime: z.enum(['node', 'bun', 'python']).optional(),
+	ports: z.array(z.number()).optional(),
+	health: z
+		.object({
+			type: z.enum(['tcp', 'http', 'command']),
+			target: z.union([z.string(), z.number()]),
+			interval: z.number().optional(),
+			timeout: z.number().optional(),
+		})
+		.optional(),
+});
+export type KhalServiceSpec = z.infer<typeof KhalServiceSpec>;
+
+export const KhalWindowSpec = z.object({
+	id: z.string(),
+	title: z.string().optional(),
+	width: z.number().default(800),
+	height: z.number().default(600),
+	resizable: z.boolean().default(true),
+});
+export type KhalWindowSpec = z.infer<typeof KhalWindowSpec>;
+
+/** A single app entry within a bundle pack manifest. */
+export const KhalAppEntrySchema = z.object({
+	/** Unique app identifier within the bundle. */
+	id: z.string(),
+	/** Human-readable app name. */
+	name: z.string(),
+	/** Frontend package reference for this app. */
+	frontend: z
+		.object({
+			package: z.string(),
+		})
+		.optional(),
+});
+export type KhalAppEntry = z.infer<typeof KhalAppEntrySchema>;
+
+export const KhalAppManifestSchema = z
+	.object({
+		$schema: z.string().optional(),
+		id: z.string(),
+		name: z.string(),
+		version: z.string(),
+		icon: z.string(),
+		description: z.string(),
+		author: z.string(),
+		permissions: z.array(KhalPermission),
+		services: z.array(KhalServiceSpec).optional(),
+		windows: z.array(KhalWindowSpec).optional(),
+		frontend: z
+			.object({
+				package: z.string(),
+				entry: z.string().default('default'),
+			})
+			.optional(),
+		backend: z
+			.object({
+				image: z.string(),
+				helmChart: z.string().optional(),
+				env: z.record(z.string(), z.string()),
+				ports: z.array(z.number()),
+			})
+			.optional(),
+		/** Relative path to the pre-built ESM bundle within the package (e.g., "dist/bundle.mjs"). */
+		bundlePath: z.string().optional(),
+		/**
+		 * When apps is present, the root frontend field is ignored —
+		 * each entry has its own frontend.
+		 */
+		apps: z.array(KhalAppEntrySchema).optional(),
+	})
+	.strict();
+
+export type KhalAppManifest = z.infer<typeof KhalAppManifestSchema>;
+
+/** Validate a raw object as KhalAppManifest. Throws ZodError with detailed messages on failure. */
+export function validateManifest(raw: unknown): KhalAppManifest {
+	return KhalAppManifestSchema.parse(raw);
 }

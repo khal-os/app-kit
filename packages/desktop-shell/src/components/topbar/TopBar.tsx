@@ -206,7 +206,7 @@ function useCmdQ(setQuitProgress: (p: number | null) => void) {
 					stopProgressAnimation();
 					setQuitProgress(1); // Full bar briefly
 					setTimeout(() => {
-						if (typeof window !== 'undefined' && window.__TAURI__) {
+						if (typeof window !== 'undefined' && (window as any).__TAURI__) {
 							// biome-ignore lint: dynamic Tauri IPC
 							(window as any).__TAURI__?.core?.invoke('quit_app');
 						}
