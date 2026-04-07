@@ -11,12 +11,13 @@ concurrency:
 permissions:
   contents: write
   pull-requests: write
+  packages: write
   id-token: write
 
 jobs:
   release:
     name: Version & Publish
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -28,7 +29,10 @@ jobs:
           node-version: 22
           cache: pnpm
           registry-url: https://registry.npmjs.org
-      - run: pnpm install --no-frozen-lockfile
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: pnpm turbo run build
 
       - name: Create Release PR or Publish

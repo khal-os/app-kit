@@ -1,6 +1,6 @@
 {
 	"name": "@khal-os/types",
-	"version": "1.0.1",
+	"version": "1.0.13",
 	"type": "module",
 	"private": false,
 	"main": "./dist/index.cjs",
@@ -27,8 +27,17 @@
 		"build": "tsup",
 		"prepublishOnly": "pnpm run build"
 	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/khal-os/app-kit.git",
+		"directory": "packages/types"
+	},
 	"publishConfig": {
+		"registry": "https://registry.npmjs.org/",
 		"access": "public"
 	},
-	"license": "Elastic-2.0"
+	"license": "Elastic-2.0",
+	"dependencies": {
+		"zod": "^4.3.6"
+	}
 }

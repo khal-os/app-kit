@@ -7,7 +7,17 @@ export type {
 	AppManifestView,
 	AppServiceConfig,
 	AppTauriConfig,
+	KhalAppEntry,
+	KhalAppManifest,
+	KhalPermission,
+	KhalServiceSpec,
+	KhalWindowSpec,
 	ServiceHealthConfig,
+} from './manifest';
+export {
+	KhalAppEntrySchema,
+	KhalAppManifestSchema,
+	validateManifest,
 } from './manifest';
 export type { ConnectionState } from './nats';
 export type { Role } from './roles';
