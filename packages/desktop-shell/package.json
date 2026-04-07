@@ -1,24 +1,55 @@
 {
 	"name": "@khal-os/desktop-shell",
 	"version": "1.0.0",
-	"private": true,
 	"type": "module",
-	"main": "./src/index.ts",
+	"private": false,
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
 	"exports": {
-		".": "./src/index.ts"
+		".": {
+			"import": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			},
+			"require": {
+				"types": "./dist/index.d.cts",
+				"default": "./dist/index.cjs"
+			}
+		}
+	},
+	"files": [
+		"dist",
+		"README.md"
+	],
+	"scripts": {
+		"build": "tsup",
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check .",
+		"prepublishOnly": "pnpm run build"
 	},
 	"peerDependencies": {
 		"react": ">=19",
 		"react-dom": ">=19",
 		"zustand": ">=5",
-		"@khal-os/sdk": ">=1",
-		"@khal-os/ui": ">=1"
+		"@khal-os/sdk": "workspace:*",
+		"@khal-os/ui": "workspace:*"
 	},
 	"dependencies": {
+		"@khal-os/types": "workspace:*",
 		"@paper-design/shaders-react": "^0.0.72",
 		"@sinclair/typebox": "^0.34.48",
 		"lucide-react": "^0.563.0",
 		"motion": "^12.38.0",
 		"uuid": "^13.0.0"
-	}
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/khal-os/app-kit.git",
+		"directory": "packages/desktop-shell"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"license": "Elastic-2.0"
 }
