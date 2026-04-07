@@ -92,6 +92,8 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure git
         run: |
@@ -105,7 +107,7 @@ jobs:
         run: |
           BUMP="${{ steps.context.outputs.bump }}"
 
-          for PKG in types os-sdk os-ui; do
+          for PKG in types os-sdk os-ui desktop-shell; do
             pnpm --filter "./packages/${PKG}" exec npm version "$BUMP" --no-git-tag-version
           done
 
@@ -133,7 +135,8 @@ jobs:
           pnpm biome format --write \
             packages/os-sdk/package.json \
             packages/types/package.json \
-            packages/os-ui/package.json
+            packages/os-ui/package.json \
+            packages/desktop-shell/package.json
 
       # ── Commit (dev only), tag, push ───────────────────────────
       - name: Commit version bump (dev only)
@@ -142,7 +145,7 @@ jobs:
           VERSION="${{ steps.bump.outputs.version }}"
           BUMP="${{ steps.context.outputs.bump }}"
 
-          git add packages/os-sdk/package.json packages/types/package.json packages/os-ui/package.json
+          git add packages/os-sdk/package.json packages/types/package.json packages/os-ui/package.json packages/desktop-shell/package.json
           if git diff --cached --quiet; then
             echo "No version changes to commit"
             exit 0
@@ -156,7 +159,7 @@ jobs:
           BRANCH="${{ steps.context.outputs.branch }}"
 
           TAGS=""
-          for PKG in types os-sdk os-ui; do
+          for PKG in types os-sdk os-ui desktop-shell; do
             TAG="${PKG}-v${VERSION}"
             if ! git rev-parse "$TAG" >/dev/null 2>&1; then
               git tag "$TAG"
@@ -198,7 +201,7 @@ jobs:
       # ── Build ──────────────────────────────────────────────────
       - name: Build all public packages
         run: |
-          for PKG in types os-sdk os-ui; do
+          for PKG in types os-sdk os-ui desktop-shell; do
             pnpm --filter "./packages/${PKG}" run build
           done
 
@@ -210,7 +213,7 @@ jobs:
           set -euo pipefail
           FAILED=0
 
-          for PKG in types os-sdk os-ui; do
+          for PKG in types os-sdk os-ui desktop-shell; do
             echo "::group::Auditing @khal-os/${PKG}"
             FILES=$(cd "packages/${PKG}" && pnpm pack --dry-run 2>&1 || true)
             echo "$FILES"
@@ -244,7 +247,7 @@ jobs:
           echo "//registry.npmjs.org/:_authToken=\${NODE_AUTH_TOKEN}" > ~/.npmrc
           echo "@khal-os:registry=https://registry.npmjs.org" >> ~/.npmrc
 
-          for PKG in types os-sdk os-ui; do
+          for PKG in types os-sdk os-ui desktop-shell; do
             echo "::group::Publishing @khal-os/${PKG} to npmjs.org"
             if [ "$BRANCH" = "main" ]; then
               pnpm --filter "./packages/${PKG}" publish --access public --no-git-checks --registry https://registry.npmjs.org
@@ -265,7 +268,7 @@ jobs:
           echo "//npm.pkg.github.com/:_authToken=\${NODE_AUTH_TOKEN}" > ~/.npmrc
           echo "@khal-os:registry=https://npm.pkg.github.com" >> ~/.npmrc
 
-          for PKG in types os-sdk os-ui; do
+          for PKG in types os-sdk os-ui desktop-shell; do
             echo "::group::Publishing @khal-os/${PKG} to GitHub Packages"
             if [ "$BRANCH" = "main" ]; then
               pnpm --filter "./packages/${PKG}" publish --no-git-checks --registry https://npm.pkg.github.com
