@@ -167,6 +167,8 @@ export interface AppManifest {
 	deploy?: AppDeployConfig;
 	/** Tauri standalone export configuration. */
 	tauri?: AppTauriConfig;
+	/** URL to the app's pre-built ESM bundle for runtime loading by desktop. */
+	bundleUrl?: string;
 }
 
 // ── Pack Contract Types (for standalone pack-* repos) ──
@@ -250,6 +252,8 @@ export const KhalAppManifestSchema = z
 				ports: z.array(z.number()),
 			})
 			.optional(),
+		/** Relative path to the pre-built ESM bundle within the package (e.g., "dist/bundle.mjs"). */
+		bundlePath: z.string().optional(),
 		/**
 		 * When apps is present, the root frontend field is ignored —
 		 * each entry has its own frontend.
