@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, dev]
 
+permissions:
+  contents: read
+  packages: read
+
 jobs:
   ci:
     name: Build & Check
