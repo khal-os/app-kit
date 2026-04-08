@@ -154,7 +154,12 @@ function KIcon({ onClick }: { onClick: () => void }) {
 					e.currentTarget.style.transform = '';
 				}}
 			>
-				<KhalLogo size={16} />
+				<svg viewBox="0 0 165 155" fill="none" width={16} height={16} aria-label="K">
+						<path
+							d="M0 0H27.4425V65.9519H71.7054L122.829 0H155.362L95.3869 76.1317L164.657 154.92H128.805L72.5913 92.2878H27.4425V154.92H0V0Z"
+							fill="currentColor"
+						/>
+					</svg>
 			</button>
 		</div>
 	);
