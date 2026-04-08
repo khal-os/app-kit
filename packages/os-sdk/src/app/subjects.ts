@@ -27,6 +27,30 @@ export const SUBJECTS = {
 		broadcast: (orgId: string) => `khal.${orgId}.notify.broadcast`,
 		user: (orgId: string, userId: string) => `khal.${orgId}.notify.user.${userId}`,
 	},
+	sandbox: {
+		/** Request sandbox creation for a user + app. Payload: { userId, appSlug } */
+		create: 'os.sandbox.create',
+		/** Request sandbox deletion for a user + app. Payload: { userId, appSlug } */
+		delete: 'os.sandbox.delete',
+		/** Query sandbox status for a user. Payload: { userId } */
+		status: 'os.sandbox.status',
+		/** Sandbox lifecycle event stream (provisioning, ready, error, deleted). */
+		events: (userId: string) => `os.sandbox.${userId}.events`,
+		/** Per-user sandbox PTY subjects — mirrors pty.* but scoped to user's sandbox. */
+		pty: {
+			create: (orgId: string, userId: string) => `khal.${orgId}.sandbox.${userId}.pty.create`,
+			destroy: (orgId: string, userId: string) => `khal.${orgId}.sandbox.${userId}.pty.destroy`,
+			list: (orgId: string, userId: string) => `khal.${orgId}.sandbox.${userId}.pty.list`,
+			data: (orgId: string, userId: string, sessionId: string) =>
+				`khal.${orgId}.sandbox.${userId}.pty.${sessionId}.data`,
+			input: (orgId: string, userId: string, sessionId: string) =>
+				`khal.${orgId}.sandbox.${userId}.pty.${sessionId}.input`,
+			resize: (orgId: string, userId: string, sessionId: string) =>
+				`khal.${orgId}.sandbox.${userId}.pty.${sessionId}.resize`,
+			exit: (orgId: string, userId: string, sessionId: string) =>
+				`khal.${orgId}.sandbox.${userId}.pty.${sessionId}.exit`,
+		},
+	},
 	auth: {
 		roleChanged: 'os.auth.role-changed',
 		membershipRevoked: 'os.auth.membership-revoked',

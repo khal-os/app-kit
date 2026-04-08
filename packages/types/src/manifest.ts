@@ -110,6 +110,48 @@ export interface AppDeployConfig {
 	envFrom?: Array<{ secretRef?: string; configMapRef?: string }>;
 }
 
+/** Sandbox resource specification for per-user container provisioning. */
+export interface SandboxResourceSpec {
+	/** CPU request (e.g., "4"). */
+	cpu: string;
+	/** Memory request (e.g., "4Gi"). */
+	memory: string;
+}
+
+/** Volume mount configuration for sandbox containers. */
+export interface SandboxMount {
+	/** Mount path inside the sandbox container. */
+	mountPath: string;
+	/** Source type: 'files' mounts user's Files PVC, 'pvc' mounts a named PVC. */
+	source: 'files' | 'pvc';
+	/** PVC name (required when source is 'pvc'). */
+	pvcName?: string;
+	/** Read-only mount. Default: false. */
+	readOnly?: boolean;
+}
+
+/**
+ * Sandbox configuration for apps that require a per-user container.
+ * When present on an app manifest, installing the app triggers sandbox
+ * provisioning via `os.sandbox.create`.
+ */
+export interface SandboxConfig {
+	/** Enable sandbox provisioning on install. */
+	enabled: boolean;
+	/** Base container image (e.g., "khal-os/sandbox-ubuntu:latest"). */
+	image?: string;
+	/** Resource requests for the sandbox pod. */
+	requests?: SandboxResourceSpec;
+	/** Resource limits for the sandbox pod (burstable). */
+	limits?: SandboxResourceSpec;
+	/** Volume mounts inside the sandbox. */
+	mounts?: SandboxMount[];
+	/** Whether the sandbox user gets sudo access. Default: true. */
+	sudoers?: boolean;
+	/** NATS subject prefix for sandbox communication (default: "os.sandbox"). */
+	natsPrefix?: string;
+}
+
 /** Tauri standalone export configuration. */
 export interface AppTauriConfig {
 	/** Whether this app supports standalone Tauri export. */
@@ -169,6 +211,8 @@ export interface AppManifest {
 	tauri?: AppTauriConfig;
 	/** URL to the app's pre-built ESM bundle for runtime loading by desktop. */
 	bundleUrl?: string;
+	/** Sandbox configuration — when present, installing this app provisions a per-user container. */
+	sandbox?: SandboxConfig;
 }
 
 // ── Pack Contract Types (for standalone pack-* repos) ──
@@ -254,6 +298,31 @@ export const KhalAppManifestSchema = z
 			.optional(),
 		/** Relative path to the pre-built ESM bundle within the package (e.g., "dist/bundle.mjs"). */
 		bundlePath: z.string().optional(),
+		/** Sandbox configuration for per-user container provisioning. */
+		sandbox: z
+			.object({
+				enabled: z.boolean(),
+				image: z.string().optional(),
+				requests: z
+					.object({ cpu: z.string(), memory: z.string() })
+					.optional(),
+				limits: z
+					.object({ cpu: z.string(), memory: z.string() })
+					.optional(),
+				mounts: z
+					.array(
+						z.object({
+							mountPath: z.string(),
+							source: z.enum(['files', 'pvc']),
+							pvcName: z.string().optional(),
+							readOnly: z.boolean().optional(),
+						}),
+					)
+					.optional(),
+				sudoers: z.boolean().optional(),
+				natsPrefix: z.string().optional(),
+			})
+			.optional(),
 		/**
 		 * When apps is present, the root frontend field is ignored —
 		 * each entry has its own frontend.
