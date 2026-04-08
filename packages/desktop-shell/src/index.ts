@@ -36,6 +36,7 @@ export type { AppComponentRenderer } from './components/WindowRenderer';
 export { setAppRenderer, WindowRenderer } from './components/WindowRenderer';
 export { WindowSwitcher } from './components/WindowSwitcher';
 export { AppErrorBoundary } from './components/window/AppErrorBoundary';
+export { BundleLoadingSpinner } from './components/window/BundleLoadingSpinner';
 export { AppWindowTabs } from './components/window/AppWindowTabs';
 export { MobileWindowStack } from './components/window/MobileWindowStack';
 export { SnapPreview } from './components/window/SnapPreview';
@@ -50,7 +51,7 @@ export type { AppManifestInfo } from './components/window/AppSettingsPanel';
 export { AppSettingsPanel } from './components/window/AppSettingsPanel';
 // -- Pack loader --
 export type { PackModule } from './loader';
-export { loadPack, PackLoadError } from './loader';
+export { clearBundleCache, loadPack, loadPackFromUrl, PackLoadError } from './loader';
 // -- Hooks --
 export { useDesktopNats } from './hooks/useDesktopNats';
 export { useGlobalKeybinds } from './hooks/useGlobalKeybinds';

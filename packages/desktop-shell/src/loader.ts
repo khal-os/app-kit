@@ -3,10 +3,12 @@ import { validateManifest, type KhalAppManifest } from '@khal-os/types';
 export class PackLoadError extends Error {
 	constructor(
 		public readonly packId: string,
-		cause: unknown,
+		cause?: unknown,
 	) {
 		super(
-			`Failed to load pack "${packId}": ${cause instanceof Error ? cause.message : String(cause)}`,
+			cause
+				? `Failed to load pack "${packId}": ${cause instanceof Error ? cause.message : String(cause)}`
+				: `Failed to load pack "${packId}"`,
 		);
 		this.name = 'PackLoadError';
 		this.cause = cause;
