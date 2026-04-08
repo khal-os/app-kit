@@ -80,18 +80,29 @@ export interface InstalledAppRow {
 	} | null;
 }
 
+/** Extract bundleUrl from the app_store manifestJson if present. */
+function extractBundleUrl(manifestJson: unknown): string | undefined {
+	if (manifestJson && typeof manifestJson === 'object' && 'bundleUrl' in manifestJson) {
+		const val = (manifestJson as Record<string, unknown>).bundleUrl;
+		return typeof val === 'string' ? val : undefined;
+	}
+	return undefined;
+}
+
 /** Map a PG installed-app row to a DesktopEntry for the launcher. */
 function mapRowToDesktopEntry(row: InstalledAppRow): DesktopEntry {
+	const bundleUrl = extractBundleUrl(row.store?.manifestJson);
 	return {
 		id: row.slug,
 		name: row.store?.name ?? row.slug,
 		icon: row.store?.iconUrl ?? row.store?.iconLucide ?? BUILTIN_ICONS[row.slug] ?? '/icons/dusk/default.svg',
 		exec: null,
-		type: 'builtin',
+		type: 'installed',
 		component: row.slug,
 		categories: row.store?.category ? [row.store.category] : ['System'],
 		comment: row.store?.shortDescription ?? null,
 		onDesktop: true,
+		bundleUrl,
 	};
 }
 

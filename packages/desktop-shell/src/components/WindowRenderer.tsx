@@ -5,6 +5,7 @@ import { useIsMobile } from '../lib/hooks/use-is-mobile';
 import { useWindowStore } from '../stores/window-store';
 import { AppErrorBoundary } from './window/AppErrorBoundary';
 import { AppWindowTabs } from './window/AppWindowTabs';
+import { BundleLoadingSpinner } from './window/BundleLoadingSpinner';
 import { MobileWindowStack } from './window/MobileWindowStack';
 import { Window } from './window/Window';
 
@@ -61,16 +62,7 @@ export function WindowRenderer() {
 
 				const manifest = renderer?.getManifest(win.appId);
 				const appContent = (
-					<Suspense
-						fallback={
-							<div
-								className="flex h-full items-center justify-center text-sm"
-								style={{ color: 'var(--khal-text-muted)' }}
-							>
-								Loading...
-							</div>
-						}
-					>
+					<Suspense fallback={<BundleLoadingSpinner appName={manifest?.label ?? win.appId} />}>
 						<AppComponent windowId={win.id} meta={win.meta} />
 					</Suspense>
 				);
