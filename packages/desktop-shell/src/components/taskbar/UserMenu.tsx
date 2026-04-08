@@ -11,6 +11,8 @@ import {
 import { Building2, LogOut, Shield, User } from 'lucide-react';
 import { useCallback, useRef } from 'react';
 
+const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
+
 const ROLE_COLORS: Record<string, string> = {
 	'platform-owner': 'var(--khal-accent-warning, #f59e0b)',
 	'platform-admin': 'var(--khal-accent-primary)',
@@ -37,7 +39,11 @@ export function UserMenu() {
 
 	const logoutFormRef = useRef<HTMLFormElement>(null);
 	const handleLogout = useCallback(() => {
-		logoutFormRef.current?.submit();
+		if (isTauri) {
+			(window as any).__TAURI__?.core?.invoke('switch_account');
+		} else {
+			logoutFormRef.current?.submit();
+		}
 	}, []);
 
 	if (khalAuth?.loading || !khalAuth?.userId) {
@@ -58,7 +64,7 @@ export function UserMenu() {
 
 	return (
 		<>
-			<form ref={logoutFormRef} method="POST" action="/auth/logout" className="hidden" />
+			{!isTauri && <form ref={logoutFormRef} method="POST" action="/auth/logout" className="hidden" />}
 			<DropdownMenu>
 				<Tooltip text={displayName} position="top" delay delayTime={400} desktopOnly>
 					<DropdownMenuTrigger
