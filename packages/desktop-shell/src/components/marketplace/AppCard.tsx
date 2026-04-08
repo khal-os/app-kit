@@ -1,7 +1,8 @@
 'use client';
 
+import type { SandboxState } from '@khal-os/sdk/app';
 import { Badge, Button, Spinner } from '@khal-os/ui';
-import { Check, Download, Lock, Trash2 } from 'lucide-react';
+import { Check, Container, Download, Lock, Trash2 } from 'lucide-react';
 
 /** Shape of a store catalog entry returned by `os.apps.store.list`. */
 export interface StoreEntry {
@@ -12,6 +13,8 @@ export interface StoreEntry {
 	iconLucide: string | null;
 	category: string | null;
 	minRole: string | null;
+	/** Whether this app requires a per-user sandbox (derived from manifestJson). */
+	sandboxRequired?: boolean;
 }
 
 export interface AppCardProps {
@@ -20,6 +23,8 @@ export interface AppCardProps {
 	authorized: boolean;
 	installing: boolean;
 	uninstalling: boolean;
+	/** Sandbox provisioning state (only for sandbox-enabled apps after install). */
+	sandboxState?: SandboxState;
 	onInstall: (slug: string) => void;
 	onUninstall: (slug: string) => void;
 }
@@ -32,9 +37,10 @@ const CATEGORY_VARIANT: Record<string, 'blue' | 'green' | 'amber' | 'purple' | '
 	AI: 'teal',
 };
 
-export function AppCard({ app, installed, authorized, installing, uninstalling, onInstall, onUninstall }: AppCardProps) {
+export function AppCard({ app, installed, authorized, installing, uninstalling, sandboxState, onInstall, onUninstall }: AppCardProps) {
 	const busy = installing || uninstalling;
 	const iconSrc = app.iconUrl ?? '/icons/dusk/default.svg';
+	const isProvisioning = sandboxState === 'provisioning';
 
 	return (
 		<div
@@ -76,7 +82,30 @@ export function AppCard({ app, installed, authorized, installing, uninstalling, 
 
 			{/* Action button */}
 			<div className="mt-auto pt-3">
-				{installed ? (
+				{isProvisioning ? (
+					<div className="flex items-center gap-2">
+						<Spinner size="sm" />
+						<span className="flex items-center gap-1 text-xs font-medium" style={{ color: 'var(--khal-text-secondary)' }}>
+							<Container className="h-3.5 w-3.5" />
+							Setting up workspace…
+						</span>
+					</div>
+				) : sandboxState === 'error' ? (
+					<div className="flex items-center gap-2">
+						<span className="text-xs font-medium" style={{ color: 'var(--khal-text-danger, #ef4444)' }}>
+							Sandbox failed
+						</span>
+						<Button
+							variant="ghost"
+							size="small"
+							className="ml-auto"
+							disabled={busy}
+							onClick={() => onUninstall(app.slug)}
+						>
+							<Trash2 className="h-3.5 w-3.5" />
+						</Button>
+					</div>
+				) : installed ? (
 					<div className="flex items-center gap-2">
 						<span className="flex items-center gap-1 text-xs font-medium" style={{ color: 'var(--khal-text-secondary)' }}>
 							<Check className="h-3.5 w-3.5" />

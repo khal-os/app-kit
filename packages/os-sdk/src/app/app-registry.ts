@@ -44,6 +44,8 @@ export interface AppManifestEntry {
 	storeMeta?: AppStoreMeta;
 	/** URL to the app's pre-built ESM bundle for runtime loading by desktop. */
 	bundleUrl?: string;
+	/** When true, installing this app provisions a per-user sandbox container. */
+	sandbox?: boolean;
 	/** Voice agent configuration. When set, the window shows a mic button (requires HELLO). */
 	voice?: {
 		/** Slug of the voice agent to connect to (registered in hello-agent-manager). */
@@ -63,6 +65,7 @@ export const APP_MANIFEST: Record<string, AppManifestEntry> = {
 		natsPrefix: 'pty',
 		defaultSize: { width: 720, height: 480 },
 		fullSizeContent: true,
+		sandbox: true,
 		voice: { agentSlug: 'terminal-assistant', label: 'Terminal Assistant' },
 	},
 	settings: {

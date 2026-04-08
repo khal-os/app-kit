@@ -45,6 +45,9 @@ export {
 	registerManifestEntry,
 	SUBJECT_PERMISSIONS,
 } from './app-registry';
+// Sandbox
+export type { SandboxState, SandboxStatus } from './sandbox';
+export { createSandbox, deleteSandbox, getSandboxStatus, sandboxPtySubjects, useSandboxStatus } from './sandbox';
 // Subject builder
 export { SubjectBuilder } from './subject-builder';
 // Subjects

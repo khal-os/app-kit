@@ -1,6 +1,7 @@
 'use client';
 
-import { getNatsClient, hasMinRole, normalizeRole, useKhalAuth } from '@khal-os/sdk/app';
+import { getNatsClient, hasMinRole, normalizeRole, useKhalAuth, useSandboxStatus } from '@khal-os/sdk/app';
+import type { SandboxState } from '@khal-os/sdk/app';
 import { Spinner } from '@khal-os/ui';
 import type { Role } from '@khal-os/types';
 import { useCallback, useEffect, useState } from 'react';
@@ -24,8 +25,22 @@ export function MarketplaceView() {
 	const [installingSet, setInstallingSet] = useState<Set<string>>(new Set());
 	const [uninstallingSet, setUninstallingSet] = useState<Set<string>>(new Set());
 
+	// Track sandbox provisioning status for the current user
+	const sandboxStatus = useSandboxStatus(auth?.userId);
+
 	// Set of currently installed app slugs (derived from desktop store)
 	const installedSlugs = new Set(desktopApps.map((a) => a.id));
+
+	/** Derive sandbox state for a specific app card. */
+	const getSandboxState = useCallback(
+		(app: StoreEntry): SandboxState | undefined => {
+			if (!app.sandboxRequired || !sandboxStatus) return undefined;
+			// Only show sandbox state for installed sandbox apps
+			if (!installedSlugs.has(app.slug)) return undefined;
+			return sandboxStatus.state;
+		},
+		[sandboxStatus, installedSlugs],
+	);
 
 	// Fetch store catalog
 	useEffect(() => {
@@ -65,6 +80,7 @@ export function MarketplaceView() {
 			setInstallingSet((prev) => new Set(prev).add(slug));
 			try {
 				const client = getNatsClient();
+				// os.apps.register in core triggers sandbox creation if manifest has sandbox: true
 				await client.request('os.apps.register', { slug }, 15000);
 				// Refresh desktop app list so the new app appears
 				await fetchApps();
@@ -87,6 +103,7 @@ export function MarketplaceView() {
 			setUninstallingSet((prev) => new Set(prev).add(slug));
 			try {
 				const client = getNatsClient();
+				// os.apps.unregister in core triggers sandbox deletion if manifest has sandbox: true
 				await client.request('os.apps.unregister', { slug }, 15000);
 				await fetchApps();
 			} catch (err) {
@@ -151,6 +168,7 @@ export function MarketplaceView() {
 								authorized={isAuthorized(app)}
 								installing={installingSet.has(app.slug)}
 								uninstalling={uninstallingSet.has(app.slug)}
+								sandboxState={getSandboxState(app)}
 								onInstall={handleInstall}
 								onUninstall={handleUninstall}
 							/>
