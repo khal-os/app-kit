@@ -5,6 +5,10 @@ export { AppIcon, AppIconWithFallback } from './components/app-icon';
 export { CommandPalette } from './components/CommandPalette';
 export { ConnectionBanner } from './components/ConnectionBanner';
 // -- Desktop chrome components --
+// -- Marketplace --
+export { MarketplaceView } from './components/marketplace/MarketplaceView';
+export { AppCard } from './components/marketplace/AppCard';
+export type { StoreEntry } from './components/marketplace/AppCard';
 export { Desktop } from './components/Desktop';
 export { DesktopBackground } from './components/DesktopBackground';
 export { DesktopIcon } from './components/DesktopIcon';
@@ -64,6 +68,7 @@ export { comboToSymbols, matchesCombo } from './lib/keyboard/types';
 export type { Platform } from './lib/platform';
 export { getPlatform, usePlatform } from './lib/platform';
 // -- Stores --
+export type { InstalledAppRow } from './stores/desktop-store';
 export { useDesktopStore, useFilteredDesktopApps } from './stores/desktop-store';
 export { useKeybindStore } from './stores/keybind-store';
 export type { DesktopTab } from './stores/tab-store';

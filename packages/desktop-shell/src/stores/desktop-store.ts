@@ -16,21 +16,10 @@ const BUILTIN_ICONS: Record<string, string> = {
 };
 
 /**
- * Static fallback shown while PG data loads or when NATS/PG is unavailable.
- * Keeps the desktop usable with core system apps even if the backend is down.
+ * Bundled apps — always visible regardless of NATS/PG state.
+ * Everything else is installable via the marketplace.
  */
-const FALLBACK_APPS: DesktopEntry[] = [
-	{
-		id: 'terminal',
-		name: 'Terminal',
-		icon: '/icons/dusk/terminal.svg',
-		exec: null,
-		type: 'builtin',
-		component: 'terminal',
-		categories: ['System'],
-		comment: 'Terminal emulator',
-		onDesktop: true,
-	},
+const BUNDLED_APPS: DesktopEntry[] = [
 	{
 		id: 'files',
 		name: 'Files',
@@ -66,8 +55,11 @@ const FALLBACK_APPS: DesktopEntry[] = [
 	},
 ];
 
+/** IDs of bundled apps — used to deduplicate when merging with installed apps. */
+const BUNDLED_IDS = new Set(BUNDLED_APPS.map((a) => a.id));
+
 /** Shape of an installed app row joined with app_store from the NATS apps.list response. */
-interface InstalledAppRow {
+export interface InstalledAppRow {
 	slug: string;
 	path: string;
 	status: string;
@@ -127,8 +119,8 @@ interface DesktopStore {
 }
 
 export const useDesktopStore = create<DesktopStore>((set, get) => ({
-	apps: FALLBACK_APPS,
-	desktopIcons: FALLBACK_APPS,
+	apps: BUNDLED_APPS,
+	desktopIcons: BUNDLED_APPS,
 	wallpaper: '/wallpapers/default.svg',
 	pinnedApps: [],
 	loading: true,
@@ -164,14 +156,16 @@ export const useDesktopStore = create<DesktopStore>((set, get) => ({
 				const callback = get().onAppsLoaded;
 				if (callback) callback(filtered as InstalledAppRow[]);
 
-				const entries = filtered.map(mapRowToDesktopEntry);
-				if (entries.length > 0) {
-					set({ apps: entries, desktopIcons: entries, loading: false });
-					return;
-				}
+				// Merge: bundled apps first, then installed apps (skip duplicates)
+				const installedEntries = filtered
+					.filter((r) => !BUNDLED_IDS.has(r.slug))
+					.map(mapRowToDesktopEntry);
+				const merged = [...BUNDLED_APPS, ...installedEntries];
+				set({ apps: merged, desktopIcons: merged, loading: false });
+				return;
 			}
 		} catch (err) {
-			// NATS unavailable or service not running -- keep fallback apps visible
+			// NATS unavailable or service not running -- keep bundled apps visible
 			set({ fetchError: `Failed to load apps: ${err instanceof Error ? err.message : String(err)}` });
 		}
 		set({ loading: false });
