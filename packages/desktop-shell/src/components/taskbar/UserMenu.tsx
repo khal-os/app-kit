@@ -40,7 +40,7 @@ export function UserMenu() {
 	const logoutFormRef = useRef<HTMLFormElement>(null);
 	const handleLogout = useCallback(() => {
 		if (isTauri) {
-			(window as any).__TAURI__?.core?.invoke('switch_account');
+			(window as any).__TAURI__.core.invoke('switch_account').catch(console.error);
 		} else {
 			logoutFormRef.current?.submit();
 		}
