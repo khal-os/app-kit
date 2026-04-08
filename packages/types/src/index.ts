@@ -12,6 +12,9 @@ export type {
 	KhalPermission,
 	KhalServiceSpec,
 	KhalWindowSpec,
+	SandboxConfig,
+	SandboxMount,
+	SandboxResourceSpec,
 	ServiceHealthConfig,
 } from './manifest';
 export {
