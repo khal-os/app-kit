@@ -1,5 +1,5 @@
 import { KhalLogo } from '@khal-os/ui';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type SVGProps } from 'react';
 import { useTabStore } from '../../stores/tab-store';
 import { useWindowStore } from '../../stores/window-store';
 import { KMenu } from './KMenu';
@@ -129,6 +129,27 @@ function TabPills({ onRequestClose }: { onRequestClose: (tabId: string) => void 
 	);
 }
 
+/* -- Inline K letterform — uses currentColor so it inherits from parent -- */
+
+function KLetterform({ size = 16, ...props }: { size?: number } & SVGProps<SVGSVGElement>) {
+	return (
+		<svg
+			viewBox="0 0 165 155"
+			fill="none"
+			xmlns="http://www.w3.org/2000/svg"
+			width={size}
+			height={size}
+			aria-label="K"
+			{...props}
+		>
+			<path
+				d="M0 0H27.4425V65.9519H71.7054L122.829 0H155.362L95.3869 76.1317L164.657 154.92H128.805L72.5913 92.2878H27.4425V154.92H0V0Z"
+				fill="currentColor"
+			/>
+		</svg>
+	);
+}
+
 /* -- K icon (right section) -- */
 
 function KIcon({ onClick }: { onClick: () => void }) {
@@ -154,7 +175,7 @@ function KIcon({ onClick }: { onClick: () => void }) {
 					e.currentTarget.style.transform = '';
 				}}
 			>
-				<KhalLogo size={16} />
+				<KLetterform size={16} />
 			</button>
 		</div>
 	);
