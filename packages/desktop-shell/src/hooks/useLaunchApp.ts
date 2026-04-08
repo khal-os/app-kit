@@ -73,7 +73,7 @@ export function useLaunchApp() {
 			try {
 				const client = getNatsClient();
 				client.publish(
-					'os.genie.apps.run.start',
+					'os.apps.run.start',
 					JSON.stringify({
 						appId: appId,
 						trigger: 'manual',

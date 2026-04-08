@@ -97,7 +97,7 @@ export const APP_MANIFEST: Record<string, AppManifestEntry> = {
 			version: '0.0.1',
 			author: 'Namastex Labs',
 			description: 'See all your tasks flow through stages. Switch between project boards.',
-			permissions: ['nats:os.genie.task.*', 'nats:os.genie.project.*'],
+			permissions: ['nats:os.task.*', 'nats:os.project.*'],
 		},
 		voice: { agentSlug: 'mission-control-assistant', label: 'Mission Control Assistant' },
 	},
