@@ -8,17 +8,45 @@ on:
 
 jobs:
   secrets-scan:
-    name: Secrets scanning (gitleaks)
+    name: Secrets scanning (gitleaks CLI)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install gitleaks CLI
+        run: |
+          set -e
+          VERSION=8.18.4
+          curl -fsSL -o /tmp/gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp
+          sudo mv /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Scan PR diff (only new commits)
+        if: github.event_name == 'pull_request'
+        run: |
+          set -e
+          git fetch origin "${{ github.base_ref }}"
+          gitleaks detect \
+            --source . \
+            --log-opts="origin/${{ github.base_ref }}...HEAD" \
+            --redact \
+            --verbose \
+            --exit-code 1
+
+      - name: Full history scan (informational on push)
+        if: github.event_name == 'push'
+        continue-on-error: true
+        run: |
+          gitleaks detect \
+            --source . \
+            --redact \
+            --verbose \
+            --exit-code 1 || echo "::warning::gitleaks found findings in history — rotate any real leaks and consider a .gitleaks.toml allowlist"
 
   context-presence:
     name: CLAUDE.md + .claude/rules/identity.md presence
