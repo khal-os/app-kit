@@ -1,0 +1,72 @@
+name: ci-guards
+
+on:
+  pull_request:
+    branches: [main, dev, v1]
+  push:
+    branches: [main, dev, v1]
+
+jobs:
+  secrets-scan:
+    name: Secrets scanning (gitleaks CLI)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks CLI
+        run: |
+          set -e
+          VERSION=8.18.4
+          curl -fsSL -o /tmp/gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz"
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp
+          sudo mv /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Scan PR diff (only new commits)
+        if: github.event_name == 'pull_request'
+        run: |
+          set -e
+          git fetch origin "${{ github.base_ref }}"
+          gitleaks detect \
+            --source . \
+            --log-opts="origin/${{ github.base_ref }}...HEAD" \
+            --redact \
+            --verbose \
+            --exit-code 1
+
+      - name: Full history scan (informational on push)
+        if: github.event_name == 'push'
+        continue-on-error: true
+        run: |
+          gitleaks detect \
+            --source . \
+            --redact \
+            --verbose \
+            --exit-code 1 || echo "::warning::gitleaks found findings in history — rotate any real leaks and consider a .gitleaks.toml allowlist"
+
+  context-presence:
+    name: CLAUDE.md + .claude/rules/identity.md presence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify required context files exist
+        run: |
+          set -e
+          missing=0
+          if [ ! -f CLAUDE.md ]; then
+            echo "::error::CLAUDE.md missing at repo root — every khal-os repo must carry workspace context"
+            missing=1
+          fi
+          if [ ! -f .claude/rules/identity.md ]; then
+            echo "::error::.claude/rules/identity.md missing — every khal-os repo must carry an identity rule"
+            missing=1
+          fi
+          if [ "$missing" -eq 1 ]; then
+            echo "See khal-os workspace docs for the CLAUDE.md + .claude/rules pattern."
+            exit 1
+          fi
+          echo "✓ CLAUDE.md + .claude/rules/identity.md present"
