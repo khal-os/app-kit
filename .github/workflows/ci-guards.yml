@@ -1,0 +1,44 @@
+name: ci-guards
+
+on:
+  pull_request:
+    branches: [main, dev, v1]
+  push:
+    branches: [main, dev, v1]
+
+jobs:
+  secrets-scan:
+    name: Secrets scanning (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  context-presence:
+    name: CLAUDE.md + .claude/rules/identity.md presence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify required context files exist
+        run: |
+          set -e
+          missing=0
+          if [ ! -f CLAUDE.md ]; then
+            echo "::error::CLAUDE.md missing at repo root — every khal-os repo must carry workspace context"
+            missing=1
+          fi
+          if [ ! -f .claude/rules/identity.md ]; then
+            echo "::error::.claude/rules/identity.md missing — every khal-os repo must carry an identity rule"
+            missing=1
+          fi
+          if [ "$missing" -eq 1 ]; then
+            echo "See khal-os workspace docs for the CLAUDE.md + .claude/rules pattern."
+            exit 1
+          fi
+          echo "✓ CLAUDE.md + .claude/rules/identity.md present"

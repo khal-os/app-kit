@@ -1,0 +1,18 @@
+# CODEOWNERS — khal-os
+#
+# Security-critical files require @namastex888 review.
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Workspace context (auto-loaded by Claude Code)
+/CLAUDE.md                @namastex888
+/.claude/                 @namastex888
+
+# CI / GitHub config
+/.github/                 @namastex888
+
+# Root-level configs
+/package.json             @namastex888
+/biome.json               @namastex888
+/Dockerfile*              @namastex888
+/Makefile                 @namastex888
+/helm/                    @namastex888
