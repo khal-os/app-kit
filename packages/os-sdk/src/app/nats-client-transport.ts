@@ -1,22 +1,16 @@
 'use client';
 
 import type { ConnectionState } from '@khal-os/types';
+import type { ConnectError } from './errors';
 
 export type NatsMessageCallback = (data: unknown, subject: string) => void;
 export type NatsStatusCallback = (connected: boolean) => void;
-export type NatsConnectionStateListener = (state: ConnectionState, detail?: Record<string, unknown>) => void;
-
 /**
- * Placeholder for the typed ConnectError taxonomy.
- * TODO(G4): replace with the shared `ConnectError` union from `./errors`.
+ * Connection-state listener. When the transition carries a failure, `err`
+ * is the typed `ConnectError` produced by the transport — callers branch on
+ * `err.kind` to pick UX (sign-in CTA, retry, version-mismatch prompt, …).
  */
-export type ConnectErrorPlaceholder =
-	| { kind: 'unauthenticated' }
-	| { kind: 'token-expired' }
-	| { kind: 'origin-rejected' }
-	| { kind: 'version-mismatch'; required?: string }
-	| { kind: 'network-unreachable'; detail?: string }
-	| { kind: 'no-config' };
+export type NatsConnectionStateListener = (state: ConnectionState, err?: ConnectError) => void;
 
 /**
  * Shared transport interface implemented by `TauriNatsClient` (IPC → Rust relay)

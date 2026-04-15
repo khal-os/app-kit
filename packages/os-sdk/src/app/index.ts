@@ -31,9 +31,13 @@ export type {
 	ServiceHealthConfig,
 } from './manifest';
 export { defineManifest, validateManifest } from './manifest';
+// ConnectError taxonomy + isFatal predicate (G4)
+export type { ConnectError } from './errors';
+export { closeCodeToConnectError, isFatal } from './errors';
 export type { NatsClient } from './nats-client';
 export { TauriNatsClient } from './nats-client';
 export type {
+	BrowserClientContext,
 	BrowserConfigReader,
 	BrowserEnterpriseConfig,
 } from './nats-client-browser';

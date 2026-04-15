@@ -1,6 +1,7 @@
 'use client';
 
 import type { ConnectionState } from '@khal-os/types';
+import type { ConnectError } from './errors';
 import {
 	type NatsClientTransport,
 	type NatsConnectionStateListener,
@@ -64,8 +65,12 @@ export class TauriNatsClient implements NatsClientTransport {
 	// Connection state
 	private _connectionState: ConnectionState = 'disconnected';
 	private _stateListeners: Array<NatsConnectionStateListener> = [];
+	private readonly signInUrl: string;
+	private readonly clientVersion: string;
 
-	constructor() {
+	constructor(ctx?: { signInUrl?: string; clientVersion?: string }) {
+		this.signInUrl = ctx?.signInUrl ?? '';
+		this.clientVersion = ctx?.clientVersion ?? '0.0.0';
 		this.connect();
 	}
 
@@ -158,14 +163,24 @@ export class TauriNatsClient implements NatsClientTransport {
 	private async connectViaTauri(): Promise<void> {
 		const tauri = (window as TauriGlobal).__TAURI__;
 		if (!tauri?.core) {
-			throw new Error('[nats-client] Tauri IPC not available. Use BrowserNatsClient in PWA mode.');
+			// No Tauri IPC — caller loaded this in a browser context by mistake.
+			// Surface as `unreachable` (no sign-in CTA helps here; the app itself
+			// is in the wrong environment).
+			this.setConnectionState('disconnected', { kind: 'unreachable', serverUrl: '' });
+			return;
 		}
 
+		let serverUrl = '';
 		try {
 			const config = (await tauri.core.invoke('get_enterprise_config')) as EnterpriseConfig | null;
 			if (!config) {
-				throw new Error('Enterprise config not available — user is not signed in');
+				this.setConnectionState('disconnected', {
+					kind: 'unauthenticated',
+					signInUrl: this.signInUrl,
+				});
+				return;
 			}
+			serverUrl = config.wsUrl;
 
 			const channel = new tauri.core.Channel<string>();
 
@@ -175,7 +190,12 @@ export class TauriNatsClient implements NatsClientTransport {
 					if (parsed.type === '_state') {
 						const stateMsg = parsed as unknown as RelayStateMessage;
 						const state = stateMsg.state as ConnectionState;
-						this.setConnectionState(state, parsed);
+						const err = tauriStateToConnectError(state, parsed, {
+							signInUrl: this.signInUrl,
+							serverUrl,
+							clientVersion: this.clientVersion,
+						});
+						this.setConnectionState(state, err);
 
 						if (state === 'connected') {
 							this.setConnected(true);
@@ -197,7 +217,7 @@ export class TauriNatsClient implements NatsClientTransport {
 			const connId = (await tauri.core.invoke('connect_enterprise_ws', {
 				url: config.wsUrl,
 				token: config.token,
-				version: config.version || '0.0.0',
+				version: config.version || this.clientVersion,
 				onMessage: channel,
 			})) as string;
 
@@ -205,9 +225,16 @@ export class TauriNatsClient implements NatsClientTransport {
 			this.setConnected(true);
 			this.setConnectionState('connected');
 		} catch (err) {
-			// biome-ignore lint/suspicious/noConsole: connection error logging
-			console.error('[nats-client] connection failed:', err);
-			this.setConnectionState('disconnected');
+			// The Rust relay surfaces auth/version failures via sentinel strings
+			// (`__AUTH_EXPIRED__...`, `__VERSION_MISMATCH__...`) inside the
+			// thrown error message — translate those into typed ConnectError.
+			const msg = err instanceof Error ? err.message : String(err);
+			const parsed = parseTauriInvokeError(msg, {
+				signInUrl: this.signInUrl,
+				serverUrl,
+				clientVersion: this.clientVersion,
+			});
+			this.setConnectionState('disconnected', parsed);
 		}
 	}
 
@@ -289,11 +316,11 @@ export class TauriNatsClient implements NatsClientTransport {
 		}
 	}
 
-	private setConnectionState(state: ConnectionState, detail?: Record<string, unknown>): void {
+	private setConnectionState(state: ConnectionState, err?: ConnectError): void {
 		this._connectionState = state;
 		for (const l of this._stateListeners) {
 			try {
-				l(state, detail);
+				l(state, err);
 			} catch {
 				// Protect against listener errors.
 			}
@@ -324,4 +351,52 @@ interface TauriGlobal {
 			Channel: TauriChannelConstructor;
 		};
 	};
+}
+
+/**
+ * Translate a Tauri relay `_state` frame to a ConnectError, if any. Returns
+ * `undefined` on benign transitions (connecting/connected) and a typed error
+ * on the failure states.
+ */
+function tauriStateToConnectError(
+	state: ConnectionState,
+	detail: Record<string, unknown>,
+	ctx: { signInUrl: string; serverUrl: string; clientVersion: string }
+): ConnectError | undefined {
+	if (state === 'auth_expired') {
+		return { kind: 'token-expired', signInUrl: ctx.signInUrl };
+	}
+	if (state === 'version_mismatch') {
+		const required = typeof detail.required === 'string' ? detail.required : 'unknown';
+		return { kind: 'version-mismatch', server: required, client: ctx.clientVersion };
+	}
+	if (state === 'disconnected') {
+		// The relay doesn't carry a close-code up through the channel today —
+		// treat as transient network drop so retry loops keep going.
+		return { kind: 'network' };
+	}
+	return undefined;
+}
+
+/**
+ * Parse the sentinel strings the Rust WS relay emits in `connect_enterprise_ws`
+ * rejections (see repos/core/tauri/src/ws_relay.rs). Fallback to `unreachable`.
+ */
+function parseTauriInvokeError(
+	msg: string,
+	ctx: { signInUrl: string; serverUrl: string; clientVersion: string }
+): ConnectError {
+	if (msg.includes('__AUTH_EXPIRED__')) {
+		return { kind: 'token-expired', signInUrl: ctx.signInUrl };
+	}
+	if (msg.includes('__VERSION_MISMATCH__')) {
+		const tail = msg.split('__VERSION_MISMATCH__')[1] ?? '';
+		let required = 'unknown';
+		try {
+			const parsed = JSON.parse(tail);
+			if (parsed && typeof parsed.required === 'string') required = parsed.required;
+		} catch {}
+		return { kind: 'version-mismatch', server: required, client: ctx.clientVersion };
+	}
+	return { kind: 'unreachable', serverUrl: ctx.serverUrl };
 }

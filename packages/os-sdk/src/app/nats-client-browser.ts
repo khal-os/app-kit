@@ -1,8 +1,8 @@
 'use client';
 
 import type { ConnectionState } from '@khal-os/types';
+import { type ConnectError, closeCodeToConnectError } from './errors';
 import {
-	type ConnectErrorPlaceholder,
 	type NatsClientTransport,
 	type NatsConnectionStateListener,
 	type NatsMessageCallback,
@@ -30,19 +30,16 @@ export interface BrowserEnterpriseConfig {
 /** Reader contract — lets the caller inject the browser adapter. */
 export type BrowserConfigReader = () => Promise<BrowserEnterpriseConfig | null>;
 
+/** Sign-in URL + client version — used to construct `ConnectError` values. */
+export interface BrowserClientContext {
+	/** Where the kernel points users who need to authenticate. */
+	signInUrl: string;
+	/** App version string; used for `version-mismatch` error payload. */
+	clientVersion: string;
+}
+
 const DEFAULT_REQUEST_TIMEOUT_MS = 5000;
 const WS_SUBPROTOCOL_VERSION = 'khal.v1';
-
-// WS close-code mapping from the kernel (see repos/core/src/lib/platform-jwt.ts
-// `rejectToCloseCode`): 4401 unauth, 4403 forbidden, 4410 token expired.
-// 4426 is the kernel's close code for version mismatch (Upgrade Required).
-function closeCodeToConnectError(code: number, reason?: string): ConnectErrorPlaceholder {
-	if (code === 4410) return { kind: 'token-expired' };
-	if (code === 4403) return { kind: 'origin-rejected' };
-	if (code === 4401) return { kind: 'unauthenticated' };
-	if (code === 4426) return { kind: 'version-mismatch' };
-	return { kind: 'network-unreachable', detail: reason ?? `close_code_${code}` };
-}
 
 /**
  * Browser NATS client.
@@ -70,13 +67,23 @@ export class BrowserNatsClient implements NatsClientTransport {
 	private ws: WebSocket | null = null;
 	private readonly readConfig: BrowserConfigReader;
 	private readonly wsFactory: (url: string, protocols: string[]) => WebSocket;
+	private readonly ctx: BrowserClientContext;
 
 	/**
 	 * @param readConfig  reader that returns the current browser enterprise config
+	 * @param ctx         sign-in URL + client version used to enrich ConnectError payloads
 	 * @param wsFactory   optional WebSocket constructor injection (defaults to global `WebSocket`) — used for tests
 	 */
-	constructor(readConfig: BrowserConfigReader, wsFactory?: (url: string, protocols: string[]) => WebSocket) {
+	constructor(
+		readConfig: BrowserConfigReader,
+		ctx?: Partial<BrowserClientContext>,
+		wsFactory?: (url: string, protocols: string[]) => WebSocket
+	) {
 		this.readConfig = readConfig;
+		this.ctx = {
+			signInUrl: ctx?.signInUrl ?? '',
+			clientVersion: ctx?.clientVersion ?? '0.0.0',
+		};
 		this.wsFactory =
 			wsFactory ??
 			((url, protocols) => {
@@ -170,16 +177,18 @@ export class BrowserNatsClient implements NatsClientTransport {
 	// --- Connection management ---
 
 	private async connect(): Promise<void> {
+		let serverUrl = '';
 		try {
 			const config = await this.readConfig();
 			if (!config) {
-				this.emitConnectError({ kind: 'no-config' });
+				this.emitConnectError({ kind: 'unauthenticated', signInUrl: this.ctx.signInUrl });
 				return;
 			}
 			if (!config.token) {
-				this.emitConnectError({ kind: 'unauthenticated' });
+				this.emitConnectError({ kind: 'unauthenticated', signInUrl: this.ctx.signInUrl });
 				return;
 			}
+			serverUrl = config.wsUrl;
 
 			const protocols = [WS_SUBPROTOCOL_VERSION, `bearer.${config.token}`];
 			const ws = this.wsFactory(config.wsUrl, protocols);
@@ -189,7 +198,11 @@ export class BrowserNatsClient implements NatsClientTransport {
 				// Server MUST echo our version as the first accepted protocol.
 				// A bare WS lib picks the first offered protocol; mismatch → version-mismatch.
 				if (ws.protocol && ws.protocol !== WS_SUBPROTOCOL_VERSION) {
-					this.emitConnectError({ kind: 'version-mismatch', required: WS_SUBPROTOCOL_VERSION });
+					this.emitConnectError({
+						kind: 'version-mismatch',
+						server: ws.protocol || 'unknown',
+						client: this.ctx.clientVersion,
+					});
 					ws.close(4426, 'subprotocol mismatch');
 					return;
 				}
@@ -213,12 +226,15 @@ export class BrowserNatsClient implements NatsClientTransport {
 
 			ws.onclose = (ev: CloseEvent) => {
 				this.setConnected(false);
-				const err = closeCodeToConnectError(ev.code, ev.reason);
+				const err = closeCodeToConnectError(ev.code, ev.reason, {
+					signInUrl: this.ctx.signInUrl,
+					serverUrl,
+					clientVersion: this.ctx.clientVersion,
+				});
 				this.emitConnectError(err);
 			};
-		} catch (err) {
-			const detail = err instanceof Error ? err.message : String(err);
-			this.emitConnectError({ kind: 'network-unreachable', detail });
+		} catch {
+			this.emitConnectError({ kind: 'unreachable', serverUrl });
 		}
 	}
 
@@ -282,10 +298,12 @@ export class BrowserNatsClient implements NatsClientTransport {
 		ws.send(JSON.stringify(frame));
 	}
 
-	private emitConnectError(err: ConnectErrorPlaceholder): void {
-		// Surface loudly via the structured connection-state listener channel.
-		// TODO(G4): emit typed ConnectError instead of flattening to string state.
-		this.setConnectionState('disconnected', { connectError: err });
+	private emitConnectError(err: ConnectError): void {
+		// Surface loudly via the structured connection-state listener channel —
+		// callers branch on `err.kind` to pick UX. The state is always
+		// 'disconnected' on connect-error paths; retry/resume is owned by the
+		// caller (e.g. ws-retry in repos/desktop).
+		this.setConnectionState('disconnected', err);
 	}
 
 	private setConnected(value: boolean): void {
@@ -300,11 +318,11 @@ export class BrowserNatsClient implements NatsClientTransport {
 		}
 	}
 
-	private setConnectionState(state: ConnectionState, detail?: Record<string, unknown>): void {
+	private setConnectionState(state: ConnectionState, err?: ConnectError): void {
 		this._connectionState = state;
 		for (const l of this._stateListeners) {
 			try {
-				l(state, detail);
+				l(state, err);
 			} catch {
 				// Protect against listener errors.
 			}

@@ -1,7 +1,12 @@
 'use client';
 
 import { TauriNatsClient } from './nats-client';
-import { type BrowserConfigReader, type BrowserEnterpriseConfig, BrowserNatsClient } from './nats-client-browser';
+import {
+	type BrowserClientContext,
+	type BrowserConfigReader,
+	type BrowserEnterpriseConfig,
+	BrowserNatsClient,
+} from './nats-client-browser';
 import type { NatsClientTransport } from './nats-client-transport';
 
 interface TauriGlobal {
@@ -56,12 +61,15 @@ let instance: NatsClientTransport | null = null;
  * Pass `opts.readBrowserConfig` to inject a custom config reader (tests, or
  * when the PWA adopts a non-localStorage storage backend).
  */
-export function getNatsClient(opts?: { readBrowserConfig?: BrowserConfigReader }): NatsClientTransport {
+export function getNatsClient(opts?: {
+	readBrowserConfig?: BrowserConfigReader;
+	ctx?: Partial<BrowserClientContext>;
+}): NatsClientTransport {
 	if (instance) return instance;
 	if (isTauriEnvironment()) {
-		instance = new TauriNatsClient();
+		instance = new TauriNatsClient(opts?.ctx);
 	} else {
-		instance = new BrowserNatsClient(opts?.readBrowserConfig ?? defaultBrowserReadConfig);
+		instance = new BrowserNatsClient(opts?.readBrowserConfig ?? defaultBrowserReadConfig, opts?.ctx);
 	}
 	return instance;
 }
