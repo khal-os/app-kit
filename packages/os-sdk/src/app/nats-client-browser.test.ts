@@ -52,6 +52,7 @@ function makeClient(token = 'tok-abc'): { client: BrowserNatsClient; ws: () => M
 	MockWebSocket.instances = [];
 	const client = new BrowserNatsClient(
 		async () => ({ wsUrl: 'wss://k.example.com/ws/nats', token, version: '1.0.0' }),
+		{ signInUrl: 'https://k.example.com/sign-in', clientVersion: '1.0.0' },
 		(url, protocols) => new MockWebSocket(url, protocols) as unknown as WebSocket
 	);
 	return { client, ws: () => MockWebSocket.instances[0] };
@@ -80,16 +81,14 @@ describe('BrowserNatsClient.connect', () => {
 
 	test('closes with version-mismatch when server echoes unknown protocol', async () => {
 		const { client, ws } = makeClient();
-		const states: Array<{ state: string; detail?: Record<string, unknown> }> = [];
-		client.onConnectionStateChange((state, detail) => {
-			states.push({ state, detail });
+		const errors: Array<{ kind?: string } | undefined> = [];
+		client.onConnectionStateChange((_state, err) => {
+			errors.push(err);
 		});
 		await flushMicrotasks();
 		ws().triggerOpen('some-other-proto');
 		expect(client.connected).toBe(false);
-		const mismatch = states.find(
-			(s) => (s.detail?.connectError as { kind?: string } | undefined)?.kind === 'version-mismatch'
-		);
+		const mismatch = errors.find((e) => e?.kind === 'version-mismatch');
 		expect(mismatch).toBeDefined();
 	});
 });
@@ -141,42 +140,72 @@ describe('BrowserNatsClient close-code → ConnectError mapping', () => {
 		[4403, 'origin-rejected'],
 		[4410, 'token-expired'],
 		[4426, 'version-mismatch'],
-		[1006, 'network-unreachable'],
+		[1006, 'network'],
 	])('close %i maps to %s', async (code, expectedKind) => {
 		const { client, ws } = makeClient();
-		const states: Array<Record<string, unknown> | undefined> = [];
-		client.onConnectionStateChange((_s, detail) => {
-			states.push(detail);
+		const errors: Array<{ kind?: string } | undefined> = [];
+		client.onConnectionStateChange((_s, err) => {
+			errors.push(err);
 		});
 		await flushMicrotasks();
 		ws().triggerOpen('khal.v1');
 		ws().triggerClose(code, 'x');
-		const mapped = states.map((d) => (d?.connectError as { kind?: string } | undefined)?.kind).filter(Boolean);
-		expect(mapped).toContain(expectedKind);
+		const kinds = errors.map((e) => e?.kind).filter(Boolean);
+		expect(kinds).toContain(expectedKind);
+	});
+
+	test('4403 with email in reason surfaces email + reason=email-domain', async () => {
+		const { client, ws } = makeClient();
+		const errors: Array<{ kind?: string; email?: string; reason?: string } | undefined> = [];
+		client.onConnectionStateChange((_s, err) => {
+			errors.push(err);
+		});
+		await flushMicrotasks();
+		ws().triggerOpen('khal.v1');
+		ws().triggerClose(4403, JSON.stringify({ error: 'email-domain', email: 'x@evil.com' }));
+		const rejection = errors.find((e) => e?.kind === 'origin-rejected');
+		expect(rejection?.email).toBe('x@evil.com');
+		expect(rejection?.reason).toBe('email-domain');
+	});
+
+	test('4401 carries signInUrl from ctx', async () => {
+		const { client, ws } = makeClient();
+		const errors: Array<{ kind?: string; signInUrl?: string } | undefined> = [];
+		client.onConnectionStateChange((_s, err) => {
+			errors.push(err);
+		});
+		await flushMicrotasks();
+		ws().triggerOpen('khal.v1');
+		ws().triggerClose(4401, '');
+		const unauth = errors.find((e) => e?.kind === 'unauthenticated');
+		expect(unauth?.signInUrl).toBe('https://k.example.com/sign-in');
 	});
 });
 
 describe('BrowserNatsClient no-config guard', () => {
-	test('emits no-config when reader returns null', async () => {
-		const client = new BrowserNatsClient(async () => null);
-		const states: Array<Record<string, unknown> | undefined> = [];
-		client.onConnectionStateChange((_s, detail) => {
-			states.push(detail);
+	test('emits unauthenticated when reader returns null', async () => {
+		const client = new BrowserNatsClient(async () => null, { signInUrl: '/login' });
+		const errors: Array<{ kind?: string; signInUrl?: string } | undefined> = [];
+		client.onConnectionStateChange((_s, err) => {
+			errors.push(err);
 		});
 		await flushMicrotasks();
-		const mapped = states.map((d) => (d?.connectError as { kind?: string } | undefined)?.kind).filter(Boolean);
-		expect(mapped).toContain('no-config');
+		const unauth = errors.find((e) => e?.kind === 'unauthenticated');
+		expect(unauth?.signInUrl).toBe('/login');
 	});
 
 	test('emits unauthenticated when reader returns config with empty token', async () => {
-		const client = new BrowserNatsClient(async () => ({ wsUrl: 'wss://x/ws/nats', token: '' }));
-		const states: Array<Record<string, unknown> | undefined> = [];
-		client.onConnectionStateChange((_s, detail) => {
-			states.push(detail);
+		const client = new BrowserNatsClient(
+			async () => ({ wsUrl: 'wss://x/ws/nats', token: '' }),
+			{ signInUrl: '/login' }
+		);
+		const errors: Array<{ kind?: string } | undefined> = [];
+		client.onConnectionStateChange((_s, err) => {
+			errors.push(err);
 		});
 		await flushMicrotasks();
-		const mapped = states.map((d) => (d?.connectError as { kind?: string } | undefined)?.kind).filter(Boolean);
-		expect(mapped).toContain('unauthenticated');
+		const kinds = errors.map((e) => e?.kind).filter(Boolean);
+		expect(kinds).toContain('unauthenticated');
 	});
 });
 
