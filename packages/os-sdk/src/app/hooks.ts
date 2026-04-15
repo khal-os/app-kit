@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { useKhalAuth } from './auth';
-import { getNatsClient } from './nats-client';
+import { getNatsClient } from './nats-client-factory';
 
 /**
  * React hook for NATS pub/sub/request over the browser WebSocket bridge.

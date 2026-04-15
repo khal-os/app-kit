@@ -1,9 +1,21 @@
 // Auth
+
+// App Registry — RBAC data and static app manifest
+export type { AppId, AppManifestEntry, AppStoreMeta } from './app-registry';
+export {
+	APP_MANIFEST,
+	DEFAULT_ROLE_PERMISSIONS,
+	getManifestEntry,
+	getVoiceAgentSlug,
+	getVoiceLabel,
+	refreshRolePermissions,
+	registerManifestEntry,
+	SUBJECT_PERMISSIONS,
+} from './app-registry';
 export type { KhalAuth } from './auth';
 export { useKhalAuth } from './auth';
 // Auth context (for provider implementations)
 export { KhalAuthContext } from './auth-context';
-
 // Hooks
 export { useNats, useNatsSubscription, useService } from './hooks';
 // Manifest
@@ -19,8 +31,16 @@ export type {
 	ServiceHealthConfig,
 } from './manifest';
 export { defineManifest, validateManifest } from './manifest';
-// NATS client
-export { getNatsClient } from './nats-client';
+export type { NatsClient } from './nats-client';
+export { TauriNatsClient } from './nats-client';
+export type {
+	BrowserConfigReader,
+	BrowserEnterpriseConfig,
+} from './nats-client-browser';
+export { BrowserNatsClient } from './nats-client-browser';
+// NATS client — transport-agnostic factory + implementation classes
+export { getNatsClient } from './nats-client-factory';
+export type { NatsClientTransport } from './nats-client-transport';
 // Env example parser
 export { parseEnvExample } from './parse-env-example';
 // Roles
@@ -33,18 +53,6 @@ export {
 	ROLE_HIERARCHY,
 	registerRolePermissions,
 } from './roles';
-// App Registry — RBAC data and static app manifest
-export type { AppId, AppManifestEntry, AppStoreMeta } from './app-registry';
-export {
-	APP_MANIFEST,
-	DEFAULT_ROLE_PERMISSIONS,
-	getManifestEntry,
-	getVoiceAgentSlug,
-	getVoiceLabel,
-	refreshRolePermissions,
-	registerManifestEntry,
-	SUBJECT_PERMISSIONS,
-} from './app-registry';
 // Sandbox
 export type { SandboxState, SandboxStatus } from './sandbox';
 export { createSandbox, deleteSandbox, getSandboxStatus, sandboxPtySubjects, useSandboxStatus } from './sandbox';

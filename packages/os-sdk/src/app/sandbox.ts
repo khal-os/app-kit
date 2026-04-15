@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getNatsClient } from './nats-client';
+import { getNatsClient } from './nats-client-factory';
 import { SUBJECTS } from './subjects';
 
 // ── Types ──
@@ -94,7 +94,9 @@ export function useSandboxStatus(userId: string | undefined): SandboxStatus | nu
 				}
 			});
 
-		return () => { cancelled = true; };
+		return () => {
+			cancelled = true;
+		};
 	}, [userId]);
 
 	// Subscribe to lifecycle events for real-time updates
@@ -110,7 +112,9 @@ export function useSandboxStatus(userId: string | undefined): SandboxStatus | nu
 			setStatus(event);
 		});
 
-		return () => { unsub(); };
+		return () => {
+			unsub();
+		};
 	}, [userId]);
 
 	return status;
