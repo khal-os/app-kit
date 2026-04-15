@@ -2,6 +2,7 @@
 
 import type { ConnectionState } from '@khal-os/types';
 import {
+	type ConnectErrorPlaceholder,
 	type NatsClientTransport,
 	type NatsConnectionStateListener,
 	type NatsMessageCallback,
@@ -15,57 +16,75 @@ interface PendingRequest {
 	timer: ReturnType<typeof setTimeout>;
 }
 
-/** Shape of `_state` messages from the Rust WS relay Channel. */
-interface RelayStateMessage {
-	type: '_state';
-	state: string;
-	[key: string]: unknown;
-}
-
-/** Enterprise config returned by `get_enterprise_config` Tauri command. */
-interface EnterpriseConfig {
+/**
+ * Browser enterprise config — read from the browser adapter's localStorage
+ * via `readEnterpriseConfig`. Injected via the constructor so this class
+ * stays free of desktop-repo dependencies.
+ */
+export interface BrowserEnterpriseConfig {
 	wsUrl: string;
 	token: string;
 	version?: string;
 }
 
+/** Reader contract — lets the caller inject the browser adapter. */
+export type BrowserConfigReader = () => Promise<BrowserEnterpriseConfig | null>;
+
 const DEFAULT_REQUEST_TIMEOUT_MS = 5000;
+const WS_SUBPROTOCOL_VERSION = 'khal.v1';
+
+// WS close-code mapping from the kernel (see repos/core/src/lib/platform-jwt.ts
+// `rejectToCloseCode`): 4401 unauth, 4403 forbidden, 4410 token expired.
+// 4426 is the kernel's close code for version mismatch (Upgrade Required).
+function closeCodeToConnectError(code: number, reason?: string): ConnectErrorPlaceholder {
+	if (code === 4410) return { kind: 'token-expired' };
+	if (code === 4403) return { kind: 'origin-rejected' };
+	if (code === 4401) return { kind: 'unauthenticated' };
+	if (code === 4426) return { kind: 'version-mismatch' };
+	return { kind: 'network-unreachable', detail: reason ?? `close_code_${code}` };
+}
 
 /**
- * Native Tauri NATS client.
+ * Browser NATS client.
  *
- * Communicates with the Rust WS relay via Tauri Channel IPC (in-process,
- * no network). The Rust side handles the actual WebSocket connection to
- * the remote KhalOS server.
+ * Opens a direct WebSocket to the kernel's `/ws/nats` endpoint using the
+ * `Sec-WebSocket-Protocol: khal.v1, bearer.<jwt>` subprotocol auth (browsers
+ * cannot set custom Authorization headers on WS upgrades). The server echoes
+ * `khal.v1` as the first protocol on successful handshake; a missing echo
+ * surfaces as a `version-mismatch` ConnectError.
  *
- * Requires `window.__TAURI__` to be available. Throws if loaded outside
- * a Tauri webview context. For browser/PWA use, see `BrowserNatsClient`
- * and the `getNatsClient()` factory.
+ * Frame format matches the Rust relay: JSON `{op, subject, data?, id?}`.
+ *
+ * TODO(G4): replace the placeholder error union with the shared `ConnectError`
+ * taxonomy and unify state machine handling across Tauri + browser.
  */
-export class TauriNatsClient implements NatsClientTransport {
+export class BrowserNatsClient implements NatsClientTransport {
 	private _connected = false;
-
-	// subject -> Set of callbacks (refcounted)
 	private subscribers = new Map<string, Set<NatsMessageCallback>>();
-
-	// correlation id -> pending request
 	private pendingRequests = new Map<string, PendingRequest>();
-
-	// status change listeners
 	private statusListeners = new Set<NatsStatusCallback>();
-
-	// Identity scoping
 	private _orgId = '';
 	private _userId = '';
-
-	// Tauri connection state
-	private connId: string | null = null;
-
-	// Connection state
 	private _connectionState: ConnectionState = 'disconnected';
 	private _stateListeners: Array<NatsConnectionStateListener> = [];
+	private ws: WebSocket | null = null;
+	private readonly readConfig: BrowserConfigReader;
+	private readonly wsFactory: (url: string, protocols: string[]) => WebSocket;
 
-	constructor() {
+	/**
+	 * @param readConfig  reader that returns the current browser enterprise config
+	 * @param wsFactory   optional WebSocket constructor injection (defaults to global `WebSocket`) — used for tests
+	 */
+	constructor(readConfig: BrowserConfigReader, wsFactory?: (url: string, protocols: string[]) => WebSocket) {
+		this.readConfig = readConfig;
+		this.wsFactory =
+			wsFactory ??
+			((url, protocols) => {
+				if (typeof WebSocket === 'undefined') {
+					throw new Error('[nats-client-browser] global WebSocket is not available in this environment');
+				}
+				return new WebSocket(url, protocols);
+			});
 		this.connect();
 	}
 
@@ -150,70 +169,60 @@ export class TauriNatsClient implements NatsClientTransport {
 
 	// --- Connection management ---
 
-	private connect(): void {
-		if (typeof window === 'undefined') return;
-		this.connectViaTauri();
-	}
-
-	private async connectViaTauri(): Promise<void> {
-		const tauri = (window as TauriGlobal).__TAURI__;
-		if (!tauri?.core) {
-			throw new Error('[nats-client] Tauri IPC not available. Use BrowserNatsClient in PWA mode.');
-		}
-
+	private async connect(): Promise<void> {
 		try {
-			const config = (await tauri.core.invoke('get_enterprise_config')) as EnterpriseConfig | null;
+			const config = await this.readConfig();
 			if (!config) {
-				throw new Error('Enterprise config not available — user is not signed in');
+				this.emitConnectError({ kind: 'no-config' });
+				return;
+			}
+			if (!config.token) {
+				this.emitConnectError({ kind: 'unauthenticated' });
+				return;
 			}
 
-			const channel = new tauri.core.Channel<string>();
+			const protocols = [WS_SUBPROTOCOL_VERSION, `bearer.${config.token}`];
+			const ws = this.wsFactory(config.wsUrl, protocols);
+			this.ws = ws;
 
-			channel.onmessage = (frame: string) => {
-				try {
-					const parsed = JSON.parse(frame) as Record<string, unknown>;
-					if (parsed.type === '_state') {
-						const stateMsg = parsed as unknown as RelayStateMessage;
-						const state = stateMsg.state as ConnectionState;
-						this.setConnectionState(state, parsed);
-
-						if (state === 'connected') {
-							this.setConnected(true);
-							for (const subject of this.subscribers.keys()) {
-								this.sendFrame({ op: 'sub', subject });
-							}
-						} else if (state === 'disconnected' || state === 'auth_expired' || state === 'version_mismatch') {
-							this.setConnected(false);
-						}
-						return;
-					}
-				} catch {
-					// fall through
+			ws.onopen = () => {
+				// Server MUST echo our version as the first accepted protocol.
+				// A bare WS lib picks the first offered protocol; mismatch → version-mismatch.
+				if (ws.protocol && ws.protocol !== WS_SUBPROTOCOL_VERSION) {
+					this.emitConnectError({ kind: 'version-mismatch', required: WS_SUBPROTOCOL_VERSION });
+					ws.close(4426, 'subprotocol mismatch');
+					return;
 				}
-
-				this.handleMessage(frame);
+				this.setConnected(true);
+				this.setConnectionState('connected');
+				// Re-subscribe known subjects (no-op on first connect).
+				for (const subject of this.subscribers.keys()) {
+					this.sendFrame({ op: 'sub', subject });
+				}
 			};
 
-			const connId = (await tauri.core.invoke('connect_enterprise_ws', {
-				url: config.wsUrl,
-				token: config.token,
-				version: config.version || '0.0.0',
-				onMessage: channel,
-			})) as string;
+			ws.onmessage = (ev: MessageEvent) => {
+				if (typeof ev.data !== 'string') return;
+				this.handleMessage(ev.data);
+			};
 
-			this.connId = connId;
-			this.setConnected(true);
-			this.setConnectionState('connected');
+			ws.onerror = () => {
+				// Browser WebSocket never exposes error details for security reasons.
+				// The subsequent `onclose` carries the code we can act on.
+			};
+
+			ws.onclose = (ev: CloseEvent) => {
+				this.setConnected(false);
+				const err = closeCodeToConnectError(ev.code, ev.reason);
+				this.emitConnectError(err);
+			};
 		} catch (err) {
-			// biome-ignore lint/suspicious/noConsole: connection error logging
-			console.error('[nats-client] connection failed:', err);
-			this.setConnectionState('disconnected');
+			const detail = err instanceof Error ? err.message : String(err);
+			this.emitConnectError({ kind: 'network-unreachable', detail });
 		}
 	}
 
-	private handleMessage(raw: string | ArrayBuffer | Blob): void {
-		if (typeof raw !== 'string') return;
-
+	private handleMessage(raw: string): void {
 		let frame: Record<string, unknown>;
 		try {
 			frame = JSON.parse(raw);
@@ -236,13 +245,13 @@ export class TauriNatsClient implements NatsClientTransport {
 
 		if (reason && subject) {
 			// biome-ignore lint/suspicious/noConsole: client-side debug logging for NATS errors
-			console.warn(`[nats-client] ${reason}: ${subject} — ${frame.error}`);
+			console.warn(`[nats-client-browser] ${reason}: ${subject} — ${frame.error}`);
 		} else if (reason) {
 			// biome-ignore lint/suspicious/noConsole: client-side debug logging for NATS errors
-			console.warn(`[nats-client] ${reason}: ${frame.error}`);
+			console.warn(`[nats-client-browser] ${reason}: ${frame.error}`);
 		} else {
 			// biome-ignore lint/suspicious/noConsole: client-side debug logging for NATS errors
-			console.warn('[nats-client] server error:', frame.error);
+			console.warn('[nats-client-browser] server error:', frame.error);
 		}
 	}
 
@@ -268,13 +277,15 @@ export class TauriNatsClient implements NatsClientTransport {
 	}
 
 	private sendFrame(frame: Record<string, unknown>): void {
-		if (!this.connId) return;
+		const ws = this.ws;
+		if (!ws || ws.readyState !== 1 /* OPEN */) return;
+		ws.send(JSON.stringify(frame));
+	}
 
-		const tauri = (window as TauriGlobal).__TAURI__;
-		tauri?.core?.invoke('send_enterprise_ws', {
-			connId: this.connId,
-			data: JSON.stringify(frame),
-		});
+	private emitConnectError(err: ConnectErrorPlaceholder): void {
+		// Surface loudly via the structured connection-state listener channel.
+		// TODO(G4): emit typed ConnectError instead of flattening to string state.
+		this.setConnectionState('disconnected', { connectError: err });
 	}
 
 	private setConnected(value: boolean): void {
@@ -299,29 +310,4 @@ export class TauriNatsClient implements NatsClientTransport {
 			}
 		}
 	}
-}
-
-/**
- * @deprecated Use `TauriNatsClient` directly, or `getNatsClient()` for the
- * transport-agnostic factory. Retained as a type alias for backward compatibility.
- */
-export type NatsClient = TauriNatsClient;
-
-// --- Tauri global type (available via withGlobalTauri: true) ---
-
-interface TauriChannel<T> {
-	onmessage: (message: T) => void;
-}
-
-interface TauriChannelConstructor {
-	new <T>(): TauriChannel<T>;
-}
-
-interface TauriGlobal {
-	__TAURI__?: {
-		core: {
-			invoke: (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
-			Channel: TauriChannelConstructor;
-		};
-	};
 }
