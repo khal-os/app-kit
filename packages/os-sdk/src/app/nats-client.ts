@@ -1,17 +1,20 @@
 'use client';
 
 import type { ConnectionState } from '@khal-os/types';
-
-type MessageCallback = (data: unknown, subject: string) => void;
-type StatusCallback = (connected: boolean) => void;
+import type { ConnectError } from './errors';
+import {
+	type NatsClientTransport,
+	type NatsConnectionStateListener,
+	type NatsMessageCallback,
+	type NatsStatusCallback,
+	subjectMatches,
+} from './nats-client-transport';
 
 interface PendingRequest {
 	resolve: (data: unknown) => void;
 	reject: (error: Error) => void;
 	timer: ReturnType<typeof setTimeout>;
 }
-
-type ConnectionStateListener = (state: ConnectionState, detail?: Record<string, unknown>) => void;
 
 /** Shape of `_state` messages from the Rust WS relay Channel. */
 interface RelayStateMessage {
@@ -30,49 +33,27 @@ interface EnterpriseConfig {
 const DEFAULT_REQUEST_TIMEOUT_MS = 5000;
 
 /**
- * Match a concrete NATS subject against a subscription pattern.
- *  - `*` matches exactly one token
- *  - `>` (must be last token) matches one or more tokens
- *  - everything else is a literal match
- */
-function subjectMatches(pattern: string, subject: string): boolean {
-	if (pattern === subject) return true;
-
-	const patParts = pattern.split('.');
-	const subParts = subject.split('.');
-
-	for (let i = 0; i < patParts.length; i++) {
-		const p = patParts[i];
-		if (p === '>') return i === patParts.length - 1 && subParts.length > i;
-		if (i >= subParts.length) return false;
-		if (p !== '*' && p !== subParts[i]) return false;
-	}
-
-	return patParts.length === subParts.length;
-}
-
-/**
  * Native Tauri NATS client.
  *
  * Communicates with the Rust WS relay via Tauri Channel IPC (in-process,
  * no network). The Rust side handles the actual WebSocket connection to
- * the remote KhalOS server. This client is the ONLY transport supported —
- * there is no browser WebSocket fallback, no local dev mode.
+ * the remote KhalOS server.
  *
  * Requires `window.__TAURI__` to be available. Throws if loaded outside
- * a Tauri webview context.
+ * a Tauri webview context. For browser/PWA use, see `BrowserNatsClient`
+ * and the `getNatsClient()` factory.
  */
-class NatsClient {
+export class TauriNatsClient implements NatsClientTransport {
 	private _connected = false;
 
 	// subject -> Set of callbacks (refcounted)
-	private subscribers = new Map<string, Set<MessageCallback>>();
+	private subscribers = new Map<string, Set<NatsMessageCallback>>();
 
 	// correlation id -> pending request
 	private pendingRequests = new Map<string, PendingRequest>();
 
 	// status change listeners
-	private statusListeners = new Set<StatusCallback>();
+	private statusListeners = new Set<NatsStatusCallback>();
 
 	// Identity scoping
 	private _orgId = '';
@@ -83,9 +64,13 @@ class NatsClient {
 
 	// Connection state
 	private _connectionState: ConnectionState = 'disconnected';
-	private _stateListeners: Array<ConnectionStateListener> = [];
+	private _stateListeners: Array<NatsConnectionStateListener> = [];
+	private readonly signInUrl: string;
+	private readonly clientVersion: string;
 
-	constructor() {
+	constructor(ctx?: { signInUrl?: string; clientVersion?: string }) {
+		this.signInUrl = ctx?.signInUrl ?? '';
+		this.clientVersion = ctx?.clientVersion ?? '0.0.0';
 		this.connect();
 	}
 
@@ -103,78 +88,56 @@ class NatsClient {
 		return this._userId;
 	}
 
-	/** Current connection state. */
 	get connectionState(): ConnectionState {
 		return this._connectionState;
 	}
 
-	/** Set the organization ID used for subject scoping. */
 	setOrgId(orgId: string): void {
 		this._orgId = orgId;
 	}
 
-	/** Set the user ID used for subject scoping. */
 	setUserId(userId: string): void {
 		this._userId = userId;
 	}
 
-	/** Register a callback invoked when connection status changes. Returns an unsubscribe function. */
-	onStatusChange(callback: StatusCallback): () => void {
+	onStatusChange(callback: NatsStatusCallback): () => void {
 		this.statusListeners.add(callback);
 		return () => {
 			this.statusListeners.delete(callback);
 		};
 	}
 
-	/**
-	 * Register a callback invoked when the connection state changes.
-	 * Provides richer state info than `onStatusChange` (reconnecting, auth_expired, etc.).
-	 * Returns an unsubscribe function.
-	 */
-	onConnectionStateChange(listener: ConnectionStateListener): () => void {
+	onConnectionStateChange(listener: NatsConnectionStateListener): () => void {
 		this._stateListeners.push(listener);
 		return () => {
 			this._stateListeners = this._stateListeners.filter((l) => l !== listener);
 		};
 	}
 
-	/**
-	 * Subscribe to a NATS subject. Supports `*` (single-token) and `>` (multi-token) wildcards.
-	 * Returns an unsubscribe function. The server-side subscription is reference-counted:
-	 * a `sub` frame is sent on first subscriber, `unsub` on last removal.
-	 */
-	subscribe(subject: string, callback: MessageCallback): () => void {
+	subscribe(subject: string, callback: NatsMessageCallback): () => void {
 		let callbacks = this.subscribers.get(subject);
 		if (!callbacks) {
 			callbacks = new Set();
 			this.subscribers.set(subject, callbacks);
-			// First subscriber for this subject: send sub frame
 			this.sendFrame({ op: 'sub', subject });
 		}
 		callbacks.add(callback);
 
-		// Return unsubscribe function
 		return () => {
 			const cbs = this.subscribers.get(subject);
 			if (!cbs) return;
 			cbs.delete(callback);
 			if (cbs.size === 0) {
 				this.subscribers.delete(subject);
-				// Last subscriber removed: send unsub frame
 				this.sendFrame({ op: 'unsub', subject });
 			}
 		};
 	}
 
-	/** Publish a message to a NATS subject (fire-and-forget). */
 	publish(subject: string, data?: unknown): void {
 		this.sendFrame({ op: 'pub', subject, data });
 	}
 
-	/**
-	 * Send a request to a NATS subject and await a reply.
-	 * Uses a correlation ID for matching. Rejects on timeout.
-	 */
 	request(subject: string, data?: unknown, timeoutMs?: number): Promise<unknown> {
 		const id = crypto.randomUUID();
 		const timeout = timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
@@ -197,40 +160,45 @@ class NatsClient {
 		this.connectViaTauri();
 	}
 
-	/**
-	 * Connect via Tauri Channel IPC.
-	 * Uses the Rust WS relay to connect to the remote KhalOS server.
-	 * Throws if Tauri IPC is not available (e.g., loaded outside a Tauri webview).
-	 */
 	private async connectViaTauri(): Promise<void> {
 		const tauri = (window as TauriGlobal).__TAURI__;
 		if (!tauri?.core) {
-			throw new Error('[nats-client] Tauri IPC not available. This SDK only runs inside the Khal OS desktop app.');
+			// No Tauri IPC — caller loaded this in a browser context by mistake.
+			// Surface as `unreachable` (no sign-in CTA helps here; the app itself
+			// is in the wrong environment).
+			this.setConnectionState('disconnected', { kind: 'unreachable', serverUrl: '' });
+			return;
 		}
 
+		let serverUrl = '';
 		try {
-			// Get auth config from Tauri (stored in Rust AppState)
 			const config = (await tauri.core.invoke('get_enterprise_config')) as EnterpriseConfig | null;
 			if (!config) {
-				throw new Error('Enterprise config not available — user is not signed in');
+				this.setConnectionState('disconnected', {
+					kind: 'unauthenticated',
+					signInUrl: this.signInUrl,
+				});
+				return;
 			}
+			serverUrl = config.wsUrl;
 
-			// Create a Tauri Channel for receiving messages from the Rust relay
 			const channel = new tauri.core.Channel<string>();
 
 			channel.onmessage = (frame: string) => {
-				// Check for connection state messages from the relay
 				try {
 					const parsed = JSON.parse(frame) as Record<string, unknown>;
 					if (parsed.type === '_state') {
 						const stateMsg = parsed as unknown as RelayStateMessage;
 						const state = stateMsg.state as ConnectionState;
-						this.setConnectionState(state, parsed);
+						const err = tauriStateToConnectError(state, parsed, {
+							signInUrl: this.signInUrl,
+							serverUrl,
+							clientVersion: this.clientVersion,
+						});
+						this.setConnectionState(state, err);
 
-						// Update simple connected flag based on state
 						if (state === 'connected') {
 							this.setConnected(true);
-							// Re-subscribe all active subjects after reconnection
 							for (const subject of this.subscribers.keys()) {
 								this.sendFrame({ op: 'sub', subject });
 							}
@@ -240,17 +208,16 @@ class NatsClient {
 						return;
 					}
 				} catch {
-					// Not JSON or not a state message — fall through to handle as NATS frame
+					// fall through
 				}
 
-				// Regular NATS frame — handle normally
 				this.handleMessage(frame);
 			};
 
 			const connId = (await tauri.core.invoke('connect_enterprise_ws', {
 				url: config.wsUrl,
 				token: config.token,
-				version: config.version || '0.0.0',
+				version: config.version || this.clientVersion,
 				onMessage: channel,
 			})) as string;
 
@@ -258,9 +225,16 @@ class NatsClient {
 			this.setConnected(true);
 			this.setConnectionState('connected');
 		} catch (err) {
-			// biome-ignore lint/suspicious/noConsole: connection error logging
-			console.error('[nats-client] connection failed:', err);
-			this.setConnectionState('disconnected');
+			// The Rust relay surfaces auth/version failures via sentinel strings
+			// (`__AUTH_EXPIRED__...`, `__VERSION_MISMATCH__...`) inside the
+			// thrown error message — translate those into typed ConnectError.
+			const msg = err instanceof Error ? err.message : String(err);
+			const parsed = parseTauriInvokeError(msg, {
+				signInUrl: this.signInUrl,
+				serverUrl,
+				clientVersion: this.clientVersion,
+			});
+			this.setConnectionState('disconnected', parsed);
 		}
 	}
 
@@ -320,7 +294,6 @@ class NatsClient {
 		}
 	}
 
-	/** Send a JSON frame via Tauri Channel IPC to the Rust WS relay. */
 	private sendFrame(frame: Record<string, unknown>): void {
 		if (!this.connId) return;
 
@@ -343,11 +316,11 @@ class NatsClient {
 		}
 	}
 
-	private setConnectionState(state: ConnectionState, detail?: Record<string, unknown>): void {
+	private setConnectionState(state: ConnectionState, err?: ConnectError): void {
 		this._connectionState = state;
 		for (const l of this._stateListeners) {
 			try {
-				l(state, detail);
+				l(state, err);
 			} catch {
 				// Protect against listener errors.
 			}
@@ -355,9 +328,14 @@ class NatsClient {
 	}
 }
 
+/**
+ * @deprecated Use `TauriNatsClient` directly, or `getNatsClient()` for the
+ * transport-agnostic factory. Retained as a type alias for backward compatibility.
+ */
+export type NatsClient = TauriNatsClient;
+
 // --- Tauri global type (available via withGlobalTauri: true) ---
 
-/** Minimal type for the Tauri Channel constructor exposed on `window.__TAURI__`. */
 interface TauriChannel<T> {
 	onmessage: (message: T) => void;
 }
@@ -375,13 +353,50 @@ interface TauriGlobal {
 	};
 }
 
-// Singleton
-let instance: NatsClient | null = null;
-
-/** Get the singleton NATS client. Creates the instance (and connects) on first call. */
-export function getNatsClient(): NatsClient {
-	if (!instance) {
-		instance = new NatsClient();
+/**
+ * Translate a Tauri relay `_state` frame to a ConnectError, if any. Returns
+ * `undefined` on benign transitions (connecting/connected) and a typed error
+ * on the failure states.
+ */
+function tauriStateToConnectError(
+	state: ConnectionState,
+	detail: Record<string, unknown>,
+	ctx: { signInUrl: string; serverUrl: string; clientVersion: string }
+): ConnectError | undefined {
+	if (state === 'auth_expired') {
+		return { kind: 'token-expired', signInUrl: ctx.signInUrl };
 	}
-	return instance;
+	if (state === 'version_mismatch') {
+		const required = typeof detail.required === 'string' ? detail.required : 'unknown';
+		return { kind: 'version-mismatch', server: required, client: ctx.clientVersion };
+	}
+	if (state === 'disconnected') {
+		// The relay doesn't carry a close-code up through the channel today —
+		// treat as transient network drop so retry loops keep going.
+		return { kind: 'network' };
+	}
+	return undefined;
+}
+
+/**
+ * Parse the sentinel strings the Rust WS relay emits in `connect_enterprise_ws`
+ * rejections (see repos/core/tauri/src/ws_relay.rs). Fallback to `unreachable`.
+ */
+function parseTauriInvokeError(
+	msg: string,
+	ctx: { signInUrl: string; serverUrl: string; clientVersion: string }
+): ConnectError {
+	if (msg.includes('__AUTH_EXPIRED__')) {
+		return { kind: 'token-expired', signInUrl: ctx.signInUrl };
+	}
+	if (msg.includes('__VERSION_MISMATCH__')) {
+		const tail = msg.split('__VERSION_MISMATCH__')[1] ?? '';
+		let required = 'unknown';
+		try {
+			const parsed = JSON.parse(tail);
+			if (parsed && typeof parsed.required === 'string') required = parsed.required;
+		} catch {}
+		return { kind: 'version-mismatch', server: required, client: ctx.clientVersion };
+	}
+	return { kind: 'unreachable', serverUrl: ctx.serverUrl };
 }
