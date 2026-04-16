@@ -91,7 +91,9 @@
 		"@khal-os/types": "workspace:*"
 	},
 	"devDependencies": {
-		"@types/node": ">=20"
+		"@types/node": ">=20",
+		"@types/ws": "^8.18.1",
+		"ws": "^8.20.0"
 	},
 	"repository": {
 		"type": "git",
