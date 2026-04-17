@@ -36,42 +36,6 @@ importers:
         specifier: ^5
         version: 5.9.3
 
-  packages/desktop-shell:
-    dependencies:
-      '@khal-os/sdk':
-        specifier: workspace:*
-        version: link:../os-sdk
-      '@khal-os/types':
-        specifier: workspace:*
-        version: link:../types
-      '@khal-os/ui':
-        specifier: workspace:*
-        version: link:../os-ui
-      '@paper-design/shaders-react':
-        specifier: ^0.0.72
-        version: 0.0.72(@types/react@19.2.14)(react@19.2.4)
-      '@sinclair/typebox':
-        specifier: ^0.34.48
-        version: 0.34.49
-      lucide-react:
-        specifier: ^0.563.0
-        version: 0.563.0(react@19.2.4)
-      motion:
-        specifier: ^12.38.0
-        version: 12.38.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      react:
-        specifier: '>=19'
-        version: 19.2.4
-      react-dom:
-        specifier: '>=19'
-        version: 19.2.4(react@19.2.4)
-      uuid:
-        specifier: ^13.0.0
-        version: 13.0.0
-      zustand:
-        specifier: '>=5'
-        version: 5.0.12(@types/react@19.2.14)(react@19.2.4)(use-sync-external-store@1.6.0(react@19.2.4))
-
   packages/dev-cli:
     dependencies:
       '@nats-io/transport-node':
@@ -1066,9 +1030,6 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@sinclair/typebox@0.34.49':
-    resolution: {integrity: sha512-brySQQs7Jtn0joV8Xh9ZV/hZb9Ozb0pmazDIASBkYKCjXrXU3mpcFahmK/z4YDhGkQvP9mWJbVyahdtU5wQA+A==}
-
   '@turbo/darwin-64@2.9.3':
     resolution: {integrity: sha512-P8foouaP+y/p+hhEGBoZpzMbpVvUMwPjDpcy6wN7EYfvvyISD1USuV27qWkczecihwuPJzQ1lDBuL8ERcavTyg==}
     cpu: [x64]
@@ -1782,10 +1743,6 @@ packages:
     resolution: {integrity: sha512-Pp6GSwGP/NrPIrxVFAIkOQeyw8lFenOHijQWkUTrDvrF4ALqylP2C/KCkeS9dpUM3KvYRQhna5vt7IL95+ZQ9w==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-
-  uuid@13.0.0:
-    resolution: {integrity: sha512-XQegIaBTVUjSHliKqcnFqYypAd4S+WCYt5NIeRs6w/UAry7z8Y9j5ZwRRL4kzq9U3sD6v+85er9FvkEaBpji2w==}
-    hasBin: true
 
   webidl-conversions@3.0.1:
     resolution: {integrity: sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==}
@@ -2613,8 +2570,6 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.60.1':
     optional: true
 
-  '@sinclair/typebox@0.34.49': {}
-
   '@turbo/darwin-64@2.9.3':
     optional: true
 
@@ -3256,8 +3211,6 @@ snapshots:
     dependencies:
       react: 19.2.4
     optional: true
-
-  uuid@13.0.0: {}
 
   webidl-conversions@3.0.1: {}
 
