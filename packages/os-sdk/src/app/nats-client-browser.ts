@@ -258,16 +258,27 @@ export class BrowserNatsClient implements NatsClientTransport {
 	private handleErrorFrame(frame: Record<string, unknown>): void {
 		const reason = typeof frame.reason === 'string' ? frame.reason : undefined;
 		const subject = typeof frame.subject === 'string' ? frame.subject : undefined;
+		const errorText = String(frame.error ?? '');
+
+		// `no responders` is informational, not actionable — it means the
+		// caller asked for a subject that has no handler attached (yet).
+		// The downstream request() Promise still rejects, so consumers can
+		// handle it; spamming warn-level logs for every polling caller
+		// (OrphanSessionToast, warm-pool probes, optional features) floods
+		// DevTools and hides real failures. Downgrade to debug.
+		const isNoResponders = /no responders/i.test(errorText) || reason === 'req failed';
+		const log = isNoResponders
+			? // biome-ignore lint/suspicious/noConsole: SDK instrumentation, downgraded to debug
+				console.debug
+			: // biome-ignore lint/suspicious/noConsole: SDK instrumentation
+				console.warn;
 
 		if (reason && subject) {
-			// biome-ignore lint/suspicious/noConsole: client-side debug logging for NATS errors
-			console.warn(`[nats-client-browser] ${reason}: ${subject} — ${frame.error}`);
+			log.call(console, `[nats-client-browser] ${reason}: ${subject} — ${frame.error}`);
 		} else if (reason) {
-			// biome-ignore lint/suspicious/noConsole: client-side debug logging for NATS errors
-			console.warn(`[nats-client-browser] ${reason}: ${frame.error}`);
+			log.call(console, `[nats-client-browser] ${reason}: ${frame.error}`);
 		} else {
-			// biome-ignore lint/suspicious/noConsole: client-side debug logging for NATS errors
-			console.warn('[nats-client-browser] server error:', frame.error);
+			log.call(console, '[nats-client-browser] server error:', frame.error);
 		}
 	}
 
